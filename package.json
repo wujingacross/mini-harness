@@ -1,0 +1,20 @@
+{
+  "name": "mini-harness",
+  "version": "1.0.0",
+  "description": "Educational mini-harness reconstructed from deepseek-harness",
+  "type": "module",
+  "scripts": {
+    "demo:echo": "tsx src/demo/echo.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "cordis": "4.0.0-rc.8"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}
