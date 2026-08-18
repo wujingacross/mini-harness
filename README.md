@@ -1,5 +1,7 @@
 # Mini Harness
 
+[English](README.md) | [简体中文](README_CN.md)
+
 > A clean-room, educational implementation of the **DeepSeek Coding Agent** infrastructure (reconstructed from `deepseek-harness`).
 
 Mini Harness is a lightweight yet architecturally faithful reconstruction of the foundation behind **DeepSeek Code**. It demonstrates how to build a production-grade coding agent framework from the ground up using **Microkernel Architecture (Cordis)**, **Event-Sourced Sessions**, and a robust **ReAct Agent Loop**.
