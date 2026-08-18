@@ -49,49 +49,49 @@
 sequenceDiagram
     autonumber
     actor User as 用户 (CLI)
-    participant Loop as ReactLoopAgent (状态机)
+    participant Agent as ReactLoopAgent (状态机)
     participant Session as Session (事件溯源日志)
     participant Prompt as SystemPrompt (装配器)
     participant LLM as LlmService (模型适配器)
     participant Tools as ToolRegistry (Waterfall 流水线)
 
-    User->>Loop: agent.send("echo hello")
-    Note over Loop: 触发状态转换: idle ➔ running
-    Loop->>Session: append("turn/start")
-    Loop->>Session: append("user/message")
+    User->>Agent: agent.send("echo hello")
+    Note over Agent: 触发状态转换: idle ➔ running
+    Agent->>Session: append("turn/start")
+    Agent->>Session: append("user/message")
 
-    rect rgb(30, 40, 60)
-        Note over Loop,Tools: Step 1: 模型思考并决定调用工具
-        Loop->>Session: append("step/start", step=1)
-        Loop->>Prompt: assemble(session)
-        Prompt-->>Loop: PromptAssembly (sections + tool schemas)
-        Loop->>Session: deriveMessages()
-        Session-->>Loop: Message[] (当前投影历史)
-        Loop->>LLM: stream({ model, systemPrompt, messages, tools })
-        LLM-->>Loop: StreamChunks (reasoning -> tool-call)
-        Note over Loop: BlockAssembler 增量拼装 Blocks
-        Loop->>Session: append("assistant/message", toolCalls=[echo])
-        Loop->>Session: append("step/end", step=1)
+    rect rgb(240, 245, 255)
+        Note over Agent,Tools: Step 1: 模型思考并决定调用工具
+        Agent->>Session: append("step/start", step=1)
+        Agent->>Prompt: assemble(session)
+        Prompt-->>Agent: PromptAssembly (sections + tool schemas)
+        Agent->>Session: deriveMessages()
+        Session-->>Agent: Message[] (当前投影历史)
+        Agent->>LLM: stream({ model, systemPrompt, messages, tools })
+        LLM-->>Agent: StreamChunks (reasoning ➔ tool-call)
+        Note over Agent: BlockAssembler 增量拼装 Blocks
+        Agent->>Session: append("assistant/message", toolCalls=[echo])
+        Agent->>Session: append("step/end", step=1)
         
-        Loop->>Tools: execute({ name: "echo", arguments: { message: "hello" } })
+        Agent->>Tools: execute({ name: "echo", arguments: { message: "hello" } })
         Note over Tools: 经由 tools/execute Waterfall 流水线
-        Tools-->>Loop: ToolExecutionResult ("ECHO: HELLO")
-        Loop->>Session: append("tool/result", content="ECHO: HELLO")
+        Tools-->>Agent: ToolExecutionResult ("ECHO: HELLO")
+        Agent->>Session: append("tool/result", content="ECHO: HELLO")
     end
 
-    rect rgb(30, 50, 40)
-        Note over Loop,LLM: Step 2: 模型接收工具结果并输出最终结论
-        Loop->>Session: append("step/start", step=2)
-        Loop->>Session: deriveMessages() (包含上一步的 tool-result)
-        Loop->>LLM: stream({ ... })
-        LLM-->>Loop: StreamChunks (text)
-        Loop->>Session: append("assistant/message", text="...")
-        Loop->>Session: append("step/end", step=2)
+    rect rgb(240, 250, 245)
+        Note over Agent,LLM: Step 2: 模型接收工具结果并输出最终结论
+        Agent->>Session: append("step/start", step=2)
+        Agent->>Session: deriveMessages() (包含上一步的 tool-result)
+        Agent->>LLM: stream({ ... })
+        LLM-->>Agent: StreamChunks (text)
+        Agent->>Session: append("assistant/message", text="...")
+        Agent->>Session: append("step/end", step=2)
     end
 
-    Loop->>Session: append("turn/end", reason=completed)
-    Note over Loop: 触发状态转换: running ➔ idle
-    Loop-->>User: 等待下一轮输入 (whenIdle 唤醒)
+    Agent->>Session: append("turn/end", reason=completed)
+    Note over Agent: 触发状态转换: running ➔ idle
+    Agent-->>User: 等待下一轮输入 (whenIdle 唤醒)
 ```
 
 ---

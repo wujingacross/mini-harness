@@ -2,6 +2,7 @@ import readline from 'node:readline'
 import type { Context } from 'cordis'
 import type { Agent } from '../agent/index.js'
 
+/** 绑定控制台 Stdio 终端交互界面：监听 Agent 广播事件实现流式打字与彩色工具卡片 */
 export function attachStdioUI(ctx: Context, agent: Agent): void {
   const rl = readline.createInterface({
     input: process.stdin,
@@ -27,6 +28,7 @@ export function attachStdioUI(ctx: Context, agent: Agent): void {
 
   let currentBlockType: string | null = null
 
+  // 监听流式分片：打字机式实时渲染思考过程与助手文本
   ctx.on('agent/chunk', (a, chunk) => {
     if (a.id !== agent.id) return
 
@@ -45,12 +47,14 @@ export function attachStdioUI(ctx: Context, agent: Agent): void {
     }
   })
 
+  // 监听工具调用广播：渲染黄色工具卡片
   ctx.on('agent/tool-call', (a, call) => {
     if (a.id !== agent.id) return
     currentBlockType = null
     console.log(yellow(`\n[Tool Call] 🔧 ${call.name}(${JSON.stringify(call.arguments)})`))
   })
 
+  // 监听工具结果广播：渲染执行结果或错误
   ctx.on('agent/tool-result', (a, res) => {
     if (a.id !== agent.id) return
     currentBlockType = null
@@ -64,6 +68,7 @@ export function attachStdioUI(ctx: Context, agent: Agent): void {
     console.log(dim(`\n--- Turn ${turn} Finished (${reason.kind}) ---\n`))
   })
 
+  /** 控制台 REPL 交互递归循环 */
   function promptUser() {
     rl.question(magenta('user > '), async (line) => {
       const trimmed = line.trim()
@@ -75,9 +80,11 @@ export function attachStdioUI(ctx: Context, agent: Agent): void {
 
       if (trimmed) {
         agent.send(trimmed)
+        // 阻塞等待本轮任务完全结束，保持有序的一问一答交互节奏
         await agent.whenIdle()
       }
 
+      // 递归开启下一轮提示
       promptUser()
     })
   }

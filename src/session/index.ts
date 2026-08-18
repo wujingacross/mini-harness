@@ -16,6 +16,7 @@ declare module 'cordis' {
   }
 }
 
+/** 将环境注入上下文 (<context>) 或纠偏指令 (<steering>) 包裹为标准 XML 结构，便于大模型区分来源与指令边界 */
 function renderTagged(tag: string, content: ContentBlock[], source?: string): ContentBlock[] {
   const open = `<${tag} source="${source ?? 'unknown'}">`
   const close = `</${tag}>`
@@ -26,6 +27,7 @@ function renderTagged(tag: string, content: ContentBlock[], source?: string): Co
   ]
 }
 
+/** 事件溯源会话：维护单向追加的不可变事件日志 (Append-only Event Log) */
 export class Session {
   private log: SessionEvent[] = []
   onAppend?: (event: SessionEvent) => void
@@ -44,6 +46,7 @@ export class Session {
     return this.log.length
   }
 
+  /** 追加事件：通过原生 structuredClone 深拷贝保证日志不可变性，分配单调 seq */
   append<T extends SessionEventType>(type: T, data: SessionEventMap[T]): SessionEvent<T> {
     const event = {
       type,
@@ -57,6 +60,7 @@ export class Session {
     return event
   }
 
+  /** 消息投影函数：从底层事件日志中纯函数式“投影计算”出大模型所需的标准 Message[] 对话历史 */
   deriveMessages(): Message[] {
     const messages: Message[] = []
     for (const event of this.log) {

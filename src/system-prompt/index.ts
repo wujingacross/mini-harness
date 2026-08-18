@@ -33,6 +33,7 @@ declare module 'cordis' {
   }
 }
 
+/** 拼接所有段落文本，若段落为函数则惰性求值 */
 export function renderPrompt(assembly: PromptAssembly): string {
   return assembly.sections
     .map(s => typeof s.text === 'function' ? s.text() : s.text)
@@ -40,6 +41,7 @@ export function renderPrompt(assembly: PromptAssembly): string {
     .join('\n\n')
 }
 
+/** 微内核动态提示词与工具装配服务 */
 export class SystemPrompt extends Service {
   private sections: PromptSection[] = []
   private toolProviders: (() => ToolSchema[])[] = []
@@ -48,6 +50,7 @@ export class SystemPrompt extends Service {
     super(ctx, 'systemPrompt')
   }
 
+  /** 动态注册提示词段落，按 order 升序排序，返回清理注销函数 */
   section(section: PromptSection): () => void {
     this.sections.push(section)
     this.sections.sort((a, b) => a.order - b.order)
@@ -59,6 +62,7 @@ export class SystemPrompt extends Service {
     }
   }
 
+  /** 注册工具元数据提供器（通常由 ToolRegistry 插件调用） */
   registerTools(provider: () => ToolSchema[]): () => void {
     this.toolProviders.push(provider)
     this.ctx.emit('system-prompt/change')
@@ -69,6 +73,7 @@ export class SystemPrompt extends Service {
     }
   }
 
+  /** 装配提示词与工具，并通过 Cordis waterfall 责任链流水线允许中间件插件拦截/修改 */
   async assemble(_session?: Session): Promise<PromptAssembly> {
     const rawTools = this.toolProviders.flatMap(p => p())
     const initial: PromptAssembly = {
@@ -76,6 +81,7 @@ export class SystemPrompt extends Service {
       tools: rawTools,
     }
 
+    // 瀑布流拦截：允许外部插件（如权限控制、动态注入）在最后一步对 prompt 和 tools 进行改写
     return await this.ctx.waterfall(this, 'system-prompt/assemble', initial, () => Promise.resolve(initial))
   }
 }
