@@ -1,0 +1,35 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Demo (echo.ts)",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "src/demo/echo.ts"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Vitest Tests",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vitest", "run", "--threads=false"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Current TS File",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "${file}"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ]
+}

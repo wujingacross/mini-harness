@@ -68,6 +68,10 @@ export function attachStdioUI(ctx: Context, agent: Agent): void {
     console.log(dim(`\n--- Turn ${turn} Finished (${reason.kind}) ---\n`))
   })
 
+  // ctx.on('session/event', (session, event) => {
+  //   console.log(`[Event ${event.seq}] ${event.type}:`, event.data)
+  // })
+
   /** 控制台 REPL 交互递归循环 */
   function promptUser() {
     rl.question(magenta('user > '), async (line) => {

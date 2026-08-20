@@ -20,18 +20,18 @@ async function main() {
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(AgentLoop)
 
-  // 3. Register System Prompt Sections
+  // 3. 注册全局/平台级系统提示词（所有 Agent 实例共享的基础人设与规范）
   ctx.systemPrompt.section({
     name: 'core-identity',
     order: 0,
     text: 'You are an intelligent coding assistant built on the mini-harness framework.',
   })
 
-  // 4. Register LLM Adapter
+  // 4. 挂载模型适配器（基于路由表绑定 mock 与 default 模型）
   const mockAdapter = new MockLlmAdapter()
   ctx.llm.registerAdapter(['mock', 'default'], mockAdapter)
 
-  // 5. Register Echo Tool
+  // 5. 注册业务工具（parameters 遵循大模型通用的标准 JSON Schema 规范）
   ctx.tools.register({
     name: 'echo',
     description: 'Echo back the input message with formatting',
@@ -47,13 +47,13 @@ async function main() {
     },
   })
 
-  // 6. Create Agent Instance
+  // 6. 创建 Agent 实例（分配独立的 Session 会话历史、状态机与专属实例级提示词）
   const agent = ctx.agentLoop.createAgent('echo-agent', {
     model: 'mock',
     systemPrompt: 'Keep responses crisp and helpful.',
   })
 
-  // 7. Attach Stdio CLI
+  // 7. 启动并绑定 Stdio 终端命令行交互界面
   attachStdioUI(ctx, agent)
 }
 
