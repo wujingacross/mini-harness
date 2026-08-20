@@ -4,6 +4,7 @@ import type { StreamChunk } from '../types/stream.js'
 
 export * from './types.js'
 export * from './mock.js'
+export * from './deepseek.js'
 
 declare module 'cordis' {
   interface Context {
@@ -15,16 +16,13 @@ declare module 'cordis' {
   }
 }
 
-/** 大模型统一网关与路由调度服务（基于适配器模式屏蔽不同模型实现） */
 export class LlmService extends Service {
-  /** 模型名称 ➔ 适配器实例映射表 */
   private adapters = new Map<string, LlmAdapter>()
 
   constructor(ctx: Context) {
     super(ctx, 'llm')
   }
 
-  /** 注册模型适配器（支持多模型绑定），返回注销清理函数 */
   registerAdapter(models: string[], adapter: LlmAdapter): () => void {
     for (const model of models) {
       this.adapters.set(model, adapter)
@@ -36,14 +34,12 @@ export class LlmService extends Service {
     }
   }
 
-  /** 统一流式生成入口：路由至对应适配器，通过 yield* 将分片数据透明转发给调用方 */
   async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
     const adapter = this.adapters.get(options.model)
     if (!adapter) {
-      throw new Error(`No adapter registered for model "${options.model}"`)
+      throw new Error(`No adapter registered for model "${options.model}". Registered models: [${Array.from(this.adapters.keys()).join(', ')}]`)
     }
 
-    // 生成器委托：原样转发适配器产生的每一个 StreamChunk
     yield* adapter.stream(options)
   }
 }

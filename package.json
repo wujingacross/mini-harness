@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "demo:echo": "tsx src/demo/echo.ts",
+    "demo:coding": "tsx src/demo/coding.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
