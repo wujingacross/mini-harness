@@ -4,6 +4,7 @@ import type { Session, TurnEndReason } from '../session/index.js'
 import type { ContentBlock, TextBlock, ToolCallBlock } from '../types/blocks.js'
 import { BlockAssembler } from '../types/stream.js'
 import { renderPrompt } from '../system-prompt/index.js'
+import type { SessionPersistence } from '../session-persistence/index.js'
 
 declare module 'cordis' {
   interface Context {
@@ -235,11 +236,12 @@ export class AgentLoop extends Service {
    * 从持久化存储中恢复指定会话，并无缝挂载为活跃的 Agent 实例
    */
   async resumeAgent(sessionId: string, agentId?: string, options: AgentOptions = {}): Promise<Agent> {
-    if (!this.ctx.sessionPersistence) {
+    const persistence = this.ctx.get('sessionPersistence') as SessionPersistence | undefined
+    if (!persistence) {
       throw new Error('SessionPersistence service (ctx.sessionPersistence) is not registered')
     }
 
-    const { header, events } = await this.ctx.sessionPersistence.load(sessionId)
+    const { header, events } = await persistence.load(sessionId)
     const session = this.ctx.sessions.create(header.id, events, header)
     const targetAgentId = agentId || `resumed-${sessionId}`
     const agent = new ReactLoopAgent(this.ctx, targetAgentId, session, options)

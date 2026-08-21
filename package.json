@@ -6,6 +6,7 @@
   "scripts": {
     "demo:echo": "tsx src/demo/echo.ts",
     "demo:coding": "tsx src/demo/coding.ts",
+    "demo:acp": "tsx src/demo/acp.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

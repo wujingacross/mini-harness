@@ -11,23 +11,23 @@ Mini Harness is a lightweight yet architecturally faithful reconstruction of the
 ## 🌟 Key Architecture Principles
 
 1. **Microkernel Architecture (Everything is a Plugin)**:
-   - Built on top of the Cordis microkernel. Core services (`ctx.llm`, `ctx.sessions`, `ctx.sessionPersistence`, `ctx.tools`, `ctx.systemPrompt`, `ctx.bash`, `ctx.agents`, `ctx.agentLoop`) are isolated plugins.
-   - Cross-cutting concerns (permissions, sandbox execution, logging, invariants) wrap around execution seams via Cordis `waterfall` without modifying core loops.
+   - Built on top of the Cordis microkernel. Core services (`ctx.llm`, `ctx.sessions`, `ctx.sessionPersistence`, `ctx.acpBridge`, `ctx.tools`, `ctx.systemPrompt`, `ctx.bash`, `ctx.agents`, `ctx.agentLoop`) are isolated plugins.
+   - Cross-cutting concerns wrap around execution seams via Cordis `waterfall` without modifying core loops.
 
 2. **Capability Seam Architecture (Interface ➔ Implementation ➔ Consumer)**:
-   - Capability layers like Bash execution and Session Persistence decouple abstract interfaces, concrete execution backends (Local/JSONL/SQLite), and model tools. Swappable with Docker sandbox or remote storage without changing model prompts.
+   - Capability layers like Bash execution and Session Persistence decouple abstract interfaces, concrete backends (Local/JSONL/SQLite), and model tools.
 
 3. **Event-Sourced Session Log**:
-   - The single source of truth is an append-only sequence of typed events (`user/message`, `assistant/chunk`, `tool/call`, `tool/result`, `turn/start`, `turn/end`).
+   - The single source of truth is an append-only sequence of typed events.
    - LLM message history is dynamically derived via the pure projection function `deriveMessages()`.
 
 4. **Industrial Persistence & Crash Recovery**:
    - Write-Behind Buffering and Turn-end Flush Checkpoints eliminate I/O lag in the hot path.
-   - Crash Recovery (`interruptedTurnClosers`) automatically synthesizes boundary closers for dangling tool calls, ensuring loaded transcripts are always valid for LLMs.
-   - Supports both JSONL and native SQLite backends with seamless `ctx.agentLoop.resumeAgent()`.
+   - Crash Recovery (`interruptedTurnClosers`) automatically synthesizes boundary closers for dangling tool calls.
 
-5. **Streaming & Block Assembler**:
-   - Handles multi-modal streams (Reasoning / CoT thinking, Text deltas, and Tool call deltas) and incrementally assembles them into structured content blocks.
+5. **Modern IDE Integration (Agent Client Protocol - ACP)**:
+   - Implements JSON-RPC 2.0 stdio protocol for native integration with **Zed** and modern ACP editors.
+   - Multi-session multiplexing with structured streaming for reasoning, text, and rich tool-call execution cards.
 
 ---
 
@@ -43,6 +43,10 @@ mini-harness/
 │   │   ├── base.ts          # Base persistence service class
 │   │   ├── jsonl.ts         # Append-only JSONL file storage backend
 │   │   └── sqlite.ts        # Node 24 native node:sqlite relational database backend
+│   ├── acp/                 # Agent Client Protocol (ACP) IDE Bridge
+│   │   ├── types.ts         # JSON-RPC 2.0 & ACP wire types + pure Codec
+│   │   ├── connection.ts    # Duplex NDJSON streaming connection
+│   │   └── bridge.ts        # AcpBridge microkernel gateway plugin
 │   ├── system-prompt/       # Ordered section prompt assembly & tool schema providers
 │   ├── tools/               # Tool registry & tools/execute waterfall pipeline
 │   │   └── bash.ts          # Model-facing bash tool definition
@@ -58,17 +62,20 @@ mini-harness/
 │   ├── ui/                  # Interactive stdio CLI with ANSI streaming rendering
 │   └── demo/
 │       ├── echo.ts          # Milestone 1: Echo Agent Demo
-│       └── coding.ts        # Milestone 2 & 3: Real Coding Agent with Persistence & Resume
+│       ├── coding.ts        # Milestone 2 & 3: Real Coding Agent with Persistence & Resume
+│       └── acp.ts           # Milestone 4: Production ACP Server for Zed / IDE
 ├── docs/                    # Architecture & implementation tutorials
 │   ├── 01-milestone1-echo-agent.md
 │   ├── 02-milestone2-coding-agent.md
-│   └── 03-milestone3-session-persistence.md
-├── tests/                   # Automated test suites (13 tests passing)
+│   ├── 03-milestone3-session-persistence.md
+│   └── 04-milestone4-acp-ide-integration.md
+├── tests/                   # Automated test suites (16 tests passing)
 │   ├── echo.spec.ts         # ReAct loop test
 │   ├── bash.spec.ts         # Bash executor & safety tests
 │   ├── deepseek-adapter.spec.ts # DeepSeek protocol serialization tests
 │   ├── session-persistence.spec.ts # JSONL / SQLite backends contract test
-│   └── resume.spec.ts       # End-to-end cross-process resume test
+│   ├── resume.spec.ts       # End-to-end cross-process resume test
+│   └── acp.spec.ts          # ACP IDE protocol bridge test
 ├── package.json
 └── tsconfig.json
 ```
@@ -89,20 +96,23 @@ pnpm test
 
 ### 3. Run Demos
 
-#### Option A: Offline Echo Demo (No API key needed)
-```bash
-pnpm run demo:echo
-```
-
-#### Option B: Real DeepSeek Coding Agent (Requires DEEPSEEK_API_KEY)
+#### Option A: Stdio Coding Agent (CLI)
 ```bash
 export DEEPSEEK_API_KEY=sk-your-key-here
 pnpm run demo:coding
 ```
 
-#### Option C: Resume Prior Session
-```bash
-RESUME_SESSION_ID=ses_xxxxxxxxxx pnpm run demo:coding
+#### Option B: ACP Server for Zed / IDE
+Add to Zed's `settings.json`:
+```json
+{
+  "agent_servers": {
+    "Mini Harness (DeepSeek)": {
+      "command": "pnpm",
+      "args": ["--dir", "/path/to/mini-harness", "run", "demo:acp"]
+    }
+  }
+}
 ```
 
 ---
@@ -112,7 +122,7 @@ RESUME_SESSION_ID=ses_xxxxxxxxxx pnpm run demo:coding
 - [x] **Milestone 1**: Foundation & Echo Agent (Microkernel, Event Sourcing, ReAct Loop, Stdio CLI)
 - [x] **Milestone 2**: Coding Agent Core (DeepSeek API SSE Adapter + Local Bash Process Group Executor)
 - [x] **Milestone 3**: Industrial Persistence (JSONL / SQLite append logs, Crash Recovery, `ctx.agentLoop.resumeAgent()`)
-- [ ] **Milestone 4**: Editor Integration (ACP - Agent Client Protocol JSON-RPC for Zed/IDE)
+- [x] **Milestone 4**: Editor Integration (ACP - Agent Client Protocol JSON-RPC for Zed/IDE)
 - [ ] **Milestone 5**: Hardening (Invariants contract verification, Cancellation, Mid-turn Steering)
 
 ---
@@ -122,3 +132,4 @@ RESUME_SESSION_ID=ses_xxxxxxxxxx pnpm run demo:coding
 * 📖 [Milestone 1 Architecture & Implementation Guide](docs/01-milestone1-echo-agent.md)
 * 📖 [Milestone 2 Coding Agent & Bash Capability Guide](docs/02-milestone2-coding-agent.md)
 * 📖 [Milestone 3 Industrial Persistence & Crash Recovery Guide](docs/03-milestone3-session-persistence.md)
+* 📖 [Milestone 4 Modern IDE Integration & ACP Gateway Guide](docs/04-milestone4-acp-ide-integration.md)
