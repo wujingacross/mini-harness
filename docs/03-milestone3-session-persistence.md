@@ -51,23 +51,23 @@
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Loop as ReactLoopAgent (主循环)
+    participant Agent as ReactLoopAgent (主循环)
     participant Session as Session (事件流)
     participant Persistence as SessionPersistence (持久化插件)
     participant Disk as 磁盘存储 (JSONL / SQLite)
 
-    Note over Loop,Persistence: 【快速通道】内存追加与写后缓冲
-    Loop->>Session: session.append("assistant/chunk")
+    Note over Agent,Persistence: 【快速通道】内存追加与写后缓冲
+    Agent->>Session: session.append("assistant/chunk")
     Session->>Persistence: 触发 session/event 监听
     Persistence->>Persistence: 压入内存 writeBuffers (耗时 0.001ms)
 
-    Note over Loop,Disk: 【检查点】Turn 结束触发原子批量刷盘
-    Loop->>Session: 本轮 Turn 全部 Step 执行完毕
-    Loop->>Persistence: await ctx.parallel("session/flush", session)
+    Note over Agent,Disk: 【检查点】Turn 结束触发原子批量刷盘
+    Agent->>Session: 本轮 Turn 全部 Step 执行完毕
+    Agent->>Persistence: await ctx.parallel("session/flush", session)
     Persistence->>Disk: 批量落盘 appendBatch(events) (带事务 / fsync)
     Disk-->>Persistence: 写入成功
     Persistence->>Persistence: 清空本轮缓冲池
-    Persistence-->>Loop: Flush 完成，状态机安全切回 idle
+    Persistence-->>Agent: Flush 完成，状态机安全切回 idle
 ```
 
 ---
