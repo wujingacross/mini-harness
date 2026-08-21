@@ -1,8 +1,15 @@
 import { Context, Service } from 'cordis'
 import type { ContentBlock, Message } from '../types/blocks.js'
-import type { SessionEvent, SessionEventMap, SessionEventType } from '../types/session.js'
+import {
+  SESSION_FORMAT_VERSION,
+  type SessionEvent,
+  type SessionEventMap,
+  type SessionEventType,
+  type SessionHeader,
+} from '../types/session.js'
 
 export * from '../types/session.js'
+export * from './repair.js'
 
 declare module 'cordis' {
   interface Context {
@@ -16,7 +23,6 @@ declare module 'cordis' {
   }
 }
 
-/** 将环境注入上下文 (<context>) 或纠偏指令 (<steering>) 包裹为标准 XML 结构，便于大模型区分来源与指令边界 */
 function renderTagged(tag: string, content: ContentBlock[], source?: string): ContentBlock[] {
   const open = `<${tag} source="${source ?? 'unknown'}">`
   const close = `</${tag}>`
@@ -27,15 +33,27 @@ function renderTagged(tag: string, content: ContentBlock[], source?: string): Co
   ]
 }
 
-/** 事件溯源会话：维护单向追加的不可变事件日志 (Append-only Event Log) */
 export class Session {
   private log: SessionEvent[] = []
+  readonly header: SessionHeader
   onAppend?: (event: SessionEvent) => void
 
-  constructor(public readonly id: string, seed?: SessionEvent[]) {
-    if (seed) {
-      this.log = seed.map(event => structuredClone(event))
+  constructor(id: string, seed?: SessionEvent[], header?: Partial<SessionHeader>) {
+    this.header = {
+      id,
+      version: header?.version ?? SESSION_FORMAT_VERSION,
+      createdAt: header?.createdAt ?? Date.now(),
+      cwd: header?.cwd,
+      parentSession: header?.parentSession,
     }
+
+    if (seed) {
+      this.log = seed.map((event) => structuredClone(event))
+    }
+  }
+
+  get id(): string {
+    return this.header.id
   }
 
   get events(): readonly SessionEvent[] {
@@ -46,7 +64,6 @@ export class Session {
     return this.log.length
   }
 
-  /** 追加事件：通过原生 structuredClone 深拷贝保证日志不可变性，分配单调 seq */
   append<T extends SessionEventType>(type: T, data: SessionEventMap[T]): SessionEvent<T> {
     const event = {
       type,
@@ -60,7 +77,6 @@ export class Session {
     return event
   }
 
-  /** 消息投影函数：从底层事件日志中纯函数式“投影计算”出大模型所需的标准 Message[] 对话历史 */
   deriveMessages(): Message[] {
     const messages: Message[] = []
     for (const event of this.log) {
@@ -106,9 +122,9 @@ export class SessionStore extends Service {
     super(ctx, 'sessions')
   }
 
-  create(id?: string, seed?: SessionEvent[]): Session {
+  create(id?: string, seed?: SessionEvent[], header?: Partial<SessionHeader>): Session {
     const sessionId = id ?? `ses_${Date.now()}_${++this.counter}`
-    const session = new Session(sessionId, seed)
+    const session = new Session(sessionId, seed, header)
     this.store.set(sessionId, session)
 
     session.onAppend = (event) => {

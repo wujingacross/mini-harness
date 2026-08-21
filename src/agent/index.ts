@@ -57,6 +57,10 @@ export class AgentRegistry extends Service {
   get(id: string): Agent | undefined {
     return this.agents.get(id)
   }
+
+  list(): Agent[] {
+    return Array.from(this.agents.values())
+  }
 }
 
 export default AgentRegistry

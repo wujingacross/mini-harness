@@ -3,5 +3,8 @@ dist
 .DS_Store
 *.log
 .env
+.sessions
+.tmp-*
+*.db
 .vscode/*
 !.vscode/launch.json

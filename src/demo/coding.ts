@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { Context } from 'cordis'
 import SessionStore from '../session/index.js'
 import SystemPrompt from '../system-prompt/index.js'
@@ -6,6 +7,7 @@ import LlmService from '../llm/index.js'
 import { DeepSeekAdapter } from '../llm/deepseek.js'
 import BashService from '../bash/index.js'
 import { createBashTool } from '../tools/bash.js'
+import { JsonlSessionPersistence } from '../session-persistence/jsonl.js'
 import AgentRegistry from '../agent/index.js'
 import AgentLoop from '../agent-loop/index.js'
 import { attachStdioUI } from '../ui/stdio.js'
@@ -29,6 +31,8 @@ async function main() {
 
   const baseURL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com'
   const modelName = process.env.DEEPSEEK_MODEL || 'deepseek-chat'
+  const storageDir = process.env.PERSISTENCE_DIR || join(process.cwd(), '.sessions')
+  const resumeId = process.env.RESUME_SESSION_ID
 
   // 1. 初始化 Cordis 微内核容器
   const ctx = new Context()
@@ -39,6 +43,7 @@ async function main() {
   await ctx.plugin(ToolRegistry)
   await ctx.plugin(LlmService)
   await ctx.plugin(BashService, { defaultCwd: process.cwd() })
+  await ctx.plugin(JsonlSessionPersistence, { storageDir })
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(AgentLoop)
 
@@ -63,14 +68,33 @@ Guidelines:
   const bashTool = createBashTool(ctx)
   ctx.tools.register(bashTool)
 
-  // 6. 创建 Coding Agent 实例
-  const agent = ctx.agentLoop.createAgent('coding-agent', {
-    model: modelName,
-    systemPrompt: 'Be proactive and use the bash tool to solve the user tasks.',
-  })
+  // 6. 创建或恢复 Coding Agent 实例
+  let agent
+  if (resumeId) {
+    console.log(`\x1b[33m[Resume] Rehydrating persisted session: ${resumeId} ...\x1b[0m`)
+    try {
+      agent = await ctx.agentLoop.resumeAgent(resumeId, 'coding-agent', {
+        model: modelName,
+        systemPrompt: 'Be proactive and use the bash tool to solve the user tasks.',
+      })
+      console.log(`\x1b[32m[Resume] Successfully resumed session with ${agent.session.events.length} historical events.\x1b[0m`)
+    } catch (err: any) {
+      console.error(`\x1b[31m[Resume Error] Failed to load session ${resumeId}: ${err?.message || err}\x1b[0m`)
+      console.log('Falling back to fresh session...')
+      agent = ctx.agentLoop.createAgent('coding-agent', {
+        model: modelName,
+        systemPrompt: 'Be proactive and use the bash tool to solve the user tasks.',
+      })
+    }
+  } else {
+    agent = ctx.agentLoop.createAgent('coding-agent', {
+      model: modelName,
+      systemPrompt: 'Be proactive and use the bash tool to solve the user tasks.',
+    })
+  }
 
   console.log(`\x1b[36m=== DeepSeek Coding Agent Initialized ===\x1b[0m`)
-  console.log(`\x1b[2mModel: ${modelName} | BaseURL: ${baseURL}\x1b[0m\n`)
+  console.log(`\x1b[2mSession ID: ${agent.session.id} | Model: ${modelName} | Storage: ${storageDir}\x1b[0m\n`)
 
   // 7. 绑定终端交互
   attachStdioUI(ctx, agent)

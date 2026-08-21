@@ -1,6 +1,17 @@
 import type { ContentBlock } from './blocks.js'
 import type { StreamChunk, TokenUsage } from './stream.js'
 
+export const SESSION_FORMAT_VERSION = 1
+
+/** 会话头部元数据：不可变的会话级别信息（独立于事件流存储） */
+export interface SessionHeader {
+  id: string
+  version: number
+  createdAt: number
+  cwd?: string
+  parentSession?: string
+}
+
 /** 对话轮次（Turn）的触发来源 */
 export type TurnTrigger =
   | { kind: 'message'; source: string }   // 用户输入新消息
@@ -10,7 +21,7 @@ export type TurnTrigger =
 /** 对话轮次（Turn）的结束原因 */
 export type TurnEndReason =
   | { kind: 'completed' }                         // 正常完成（无需继续调用工具）
-  | { kind: 'aborted'; reason?: string }          // 被外部打断/取消
+  | { kind: 'aborted'; reason?: string }          // 被外部打断/取消/崩溃中断
   | { kind: 'error'; step: number; message: string } // 异常报错终止
   | { kind: 'max-tokens' }                        // Token 达到上限
 
