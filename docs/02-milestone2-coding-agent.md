@@ -41,18 +41,18 @@
 
 ```mermaid
 graph TD
-    subgraph 1. Interface (抽象契约)
+    subgraph S1["1. Interface (抽象契约)"]
         B1["BashExecutor (抽象类)"]
         B2["BashRunOptions / BashRunResult (输入输出词表)"]
     end
 
-    subgraph 2. Implementation (具体执行后端)
+    subgraph S2["2. Implementation (具体执行后端)"]
         I1["LocalBashExecutor (本地 Node.js 进程组实现)"]
-        I2[/"DockerSandboxExecutor (未来容器沙箱实现)"/]
-        I3[/"RemoteSshExecutor (未来远程机器执行)"/]
+        I2["DockerSandboxExecutor (未来容器沙箱实现)"]
+        I3["RemoteSshExecutor (未来远程机器执行)"]
     end
 
-    subgraph 3. Consumer (面向模型/用户的工具)
+    subgraph S3["3. Consumer (面向模型/用户的工具)"]
         C1["createBashTool(ctx) (注册到 ctx.tools)"]
         C2["System Prompt bash 工具说明指南"]
     end
@@ -99,23 +99,24 @@ graph TD
 
 ```mermaid
 sequenceDiagram
+    autonumber
     participant Adapter as DeepSeekAdapter
-    participant API as DeepSeek API (/chat/completions)
-    participant Loop as ReactLoopAgent (BlockAssembler)
+    participant API as DeepSeek API
+    participant Agent as ReactLoopAgent
 
-    Adapter->>API: POST (stream=true, tools=[bash], messages=...)
-    API-->>Adapter: SSE Chunk: delta { reasoning_content: "I should..." }
-    Adapter-->>Loop: StreamChunk { type: "reasoning-delta", text: "..." }
+    Adapter->>API: POST /chat/completions (stream=true)
+    API-->>Adapter: SSE Chunk: delta.reasoning_content ("I should...")
+    Adapter-->>Agent: StreamChunk: reasoning-delta ("...")
     
-    API-->>Adapter: SSE Chunk: delta { tool_calls: [{ id: "call_1", function: { name: "bash", arguments: "{\"comm" } }] }
-    Adapter-->>Loop: StreamChunk { type: "tool-call-delta", name: "bash", argumentsDelta: "{\"comm" }
+    API-->>Adapter: SSE Chunk: delta.tool_calls (id="call_1", name="bash")
+    Adapter-->>Agent: StreamChunk: tool-call-delta (name="bash", args='{"comm')
 
-    API-->>Adapter: SSE Chunk: delta { tool_calls: [{ function: { arguments: "and\":\"ls\"}" } }] }
-    Adapter-->>Loop: StreamChunk { type: "tool-call-delta", argumentsDelta: "and\":\"ls\"}" }
+    API-->>Adapter: SSE Chunk: delta.tool_calls (args='and":"ls"}')
+    Adapter-->>Agent: StreamChunk: tool-call-delta (args='and":"ls"}')
 
-    API-->>Adapter: SSE Chunk: data: [DONE], usage: { prompt: 150, completion: 80 }
-    Adapter-->>Loop: StreamChunk { type: "usage", usage: ... }
-    Adapter-->>Loop: StreamChunk { type: "finish", reason: { kind: "tool-use" } }
+    API-->>Adapter: SSE Chunk: data: [DONE] (usage: { prompt: 150, completion: 80 })
+    Adapter-->>Agent: StreamChunk: usage
+    Adapter-->>Agent: StreamChunk: finish (reason="tool-use")
 ```
 
 ### 关键细节处理：
