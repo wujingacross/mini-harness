@@ -51,6 +51,26 @@ export class ReactLoopAgent implements Agent {
     }
   }
 
+  /**
+   * 中途干预与航向纠偏（Mid-turn Steering）：
+   * 在 Agent 正在执行多步任务（running）时，直接向当前 Turn 注入即时干预信息，
+   * 下一步（Step）大模型在派生历史消息时会立即看到 <steering> 指示并调整后续行动。
+   */
+  steer(content: ContentBlock[] | string): void {
+    const blocks: ContentBlock[] =
+      typeof content === 'string' ? [{ type: 'text', text: content }] : content
+
+    if (this.status === 'running') {
+      this.session.append('steering/message', {
+        turn: this.turnCounter,
+        content: blocks,
+        source: 'user',
+      })
+    } else {
+      this.send(blocks)
+    }
+  }
+
   cancel(reason?: string): void {
     this.inbox = []
     if (this.abortController) {
@@ -133,7 +153,7 @@ export class ReactLoopAgent implements Agent {
       const assembly = await this.ctx.systemPrompt.assemble(this.session)
       const systemText = [renderPrompt(assembly), this.options.systemPrompt].filter(Boolean).join('\n\n')
 
-      // 2. 从事件流派生当前消息历史 (deriveMessages 纯函数投影)
+      // 2. 从事件流派生当前消息历史 (deriveMessages 纯函数投影，自动包含 steering)
       const messages = this.session.deriveMessages()
 
       // 3. 调用大模型流式生成
