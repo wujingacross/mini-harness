@@ -81,11 +81,11 @@ export class AcpBridge extends Service {
     this.conn.onRequest('initialize', async (_params: AcpInitializeParams): Promise<AcpInitializeResult> => {
       return {
         protocolVersion: 1,
-        serverInfo: {
+        agentInfo: {
           name: this.serverName,
           version: this.serverVersion,
         },
-        serverCapabilities: {
+        agentCapabilities: {
           loadSession: true,
         },
       }
@@ -190,13 +190,15 @@ export class AcpBridge extends Service {
 
       if (chunk.type === 'reasoning-delta') {
         this.notifyUpdate(sessionId, {
+          sessionUpdate: 'agent_thought_chunk',
           type: 'agent_thought_chunk',
-          content: chunk.text,
+          content: { type: 'text', text: chunk.text },
         })
       } else if (chunk.type === 'text-delta') {
         this.notifyUpdate(sessionId, {
+          sessionUpdate: 'agent_message_chunk',
           type: 'agent_message_chunk',
-          content: chunk.text,
+          content: { type: 'text', text: chunk.text },
         })
       }
     })
@@ -207,11 +209,14 @@ export class AcpBridge extends Service {
       if (!sessionId) return
 
       this.notifyUpdate(sessionId, {
+        sessionUpdate: 'tool_call',
         type: 'tool_call',
+        toolCallId: call.id,
         callId: call.id,
         name: call.name,
         title: `${call.name} (${JSON.stringify(call.arguments)})`,
         kind: 'execute',
+        status: 'in_progress',
         rawInput: call.arguments,
       })
     })
@@ -222,9 +227,14 @@ export class AcpBridge extends Service {
       if (!sessionId) return
 
       this.notifyUpdate(sessionId, {
+        sessionUpdate: 'tool_call_update',
         type: 'tool_call_update',
+        toolCallId: res.callId,
         callId: res.callId,
-        content: res.content,
+        status: res.isError ? 'failed' : 'completed',
+        content: typeof res.content === 'string'
+          ? [{ type: 'content', content: { type: 'text', text: res.content } }]
+          : res.content,
         isError: res.isError,
       })
     })
@@ -234,6 +244,7 @@ export class AcpBridge extends Service {
     this.conn.notify<AcpSessionUpdateParams>('session/update', {
       sessionId,
       update,
+      sessionUpdate: update,
     })
   }
 
@@ -244,29 +255,49 @@ export class AcpBridge extends Service {
           .filter((b: any) => b.type === 'text')
           .map((b: any) => b.text)
           .join('\n')
-        this.notifyUpdate(sessionId, { type: 'user_message_chunk', content: text })
+        this.notifyUpdate(sessionId, {
+          sessionUpdate: 'user_message_chunk',
+          type: 'user_message_chunk',
+          content: { type: 'text', text },
+        })
       } else if (e.type === 'assistant/message') {
         for (const block of e.data.content) {
           if (block.type === 'text') {
-            this.notifyUpdate(sessionId, { type: 'agent_message_chunk', content: block.text })
+            this.notifyUpdate(sessionId, {
+              sessionUpdate: 'agent_message_chunk',
+              type: 'agent_message_chunk',
+              content: { type: 'text', text: block.text },
+            })
           } else if (block.type === 'reasoning') {
-            this.notifyUpdate(sessionId, { type: 'agent_thought_chunk', content: block.text })
+            this.notifyUpdate(sessionId, {
+              sessionUpdate: 'agent_thought_chunk',
+              type: 'agent_thought_chunk',
+              content: { type: 'text', text: block.text },
+            })
           } else if (block.type === 'tool-call') {
             this.notifyUpdate(sessionId, {
+              sessionUpdate: 'tool_call',
               type: 'tool_call',
+              toolCallId: block.id,
               callId: block.id,
               name: block.name,
               title: `${block.name} (${JSON.stringify(block.arguments)})`,
               kind: 'execute',
+              status: 'completed',
               rawInput: block.arguments,
             })
           }
         }
       } else if (e.type === 'tool/result') {
         this.notifyUpdate(sessionId, {
+          sessionUpdate: 'tool_call_update',
           type: 'tool_call_update',
+          toolCallId: e.data.callId,
           callId: e.data.callId,
-          content: e.data.content,
+          status: e.data.isError ? 'failed' : 'completed',
+          content: typeof e.data.content === 'string'
+            ? [{ type: 'content', content: { type: 'text', text: e.data.content } }]
+            : e.data.content,
           isError: e.data.isError,
         })
       }

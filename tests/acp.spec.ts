@@ -100,8 +100,8 @@ describe('Milestone 4: Agent Client Protocol (ACP) IDE Bridge', () => {
     })
 
     expect(result.protocolVersion).toBe(1)
-    expect(result.serverInfo.name).toBe('mini-harness-acp')
-    expect(result.serverCapabilities.loadSession).toBe(true)
+    expect(result.agentInfo.name).toBe('mini-harness-acp')
+    expect(result.agentCapabilities.loadSession).toBe(true)
   })
 
   it('handles session/new, session/prompt with streaming updates and tool execution', async () => {
@@ -131,7 +131,10 @@ describe('Milestone 4: Agent Client Protocol (ACP) IDE Bridge', () => {
     expect(toolCall.name).toBe('echo')
 
     const toolResult = receivedUpdates.find((u) => u.type === 'tool_call_update')
-    expect(toolResult.content).toContain('ECHO_OUTPUT: hello-acp')
+    const resultContent = Array.isArray(toolResult.content)
+      ? toolResult.content[0]?.content?.text
+      : toolResult.content
+    expect(resultContent).toContain('ECHO_OUTPUT: hello-acp')
   })
 
   it('handles session/load with full historical replay to IDE client', async () => {
@@ -156,7 +159,7 @@ describe('Milestone 4: Agent Client Protocol (ACP) IDE Bridge', () => {
     // 验证历史记录已回放给 IDE
     const userChunk = receivedUpdates.find((u) => u.type === 'user_message_chunk')
     const agentChunk = receivedUpdates.find((u) => u.type === 'agent_message_chunk')
-    expect(userChunk?.content).toBe('Previous user question')
-    expect(agentChunk?.content).toBe('Previous answer')
+    expect(userChunk?.content?.text || userChunk?.content).toBe('Previous user question')
+    expect(agentChunk?.content?.text || agentChunk?.content).toBe('Previous answer')
   })
 })

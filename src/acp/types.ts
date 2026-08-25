@@ -36,16 +36,53 @@ export type JsonRpcMessage = JsonRpcRequest | JsonRpcResponse | JsonRpcNotificat
 
 export type AcpStopReason = 'end_turn' | 'max_tokens' | 'cancelled'
 
+export type AcpTextContent = {
+  type: 'text'
+  text: string
+}
+
+export type AcpToolCallStatus = 'pending' | 'in_progress' | 'completed' | 'failed'
+
 export type AcpContentBlock =
   | { type: 'text'; text: string }
   | { type: 'resource_link'; name: string; uri: string }
 
 export type AcpSessionUpdate =
-  | { type: 'agent_thought_chunk'; content: string }
-  | { type: 'agent_message_chunk'; content: string }
-  | { type: 'user_message_chunk'; content: string }
-  | { type: 'tool_call'; callId: string; name: string; title?: string; kind?: string; rawInput?: any }
-  | { type: 'tool_call_update'; callId: string; content?: string; isError?: boolean }
+  | {
+      sessionUpdate?: 'agent_thought_chunk'
+      type: 'agent_thought_chunk'
+      content: AcpTextContent | string
+    }
+  | {
+      sessionUpdate?: 'agent_message_chunk'
+      type: 'agent_message_chunk'
+      content: AcpTextContent | string
+    }
+  | {
+      sessionUpdate?: 'user_message_chunk'
+      type: 'user_message_chunk'
+      content: AcpTextContent | string
+    }
+  | {
+      sessionUpdate?: 'tool_call'
+      type: 'tool_call'
+      toolCallId: string
+      callId?: string
+      name: string
+      title?: string
+      kind?: string
+      status?: AcpToolCallStatus
+      rawInput?: any
+    }
+  | {
+      sessionUpdate?: 'tool_call_update'
+      type: 'tool_call_update'
+      toolCallId: string
+      callId?: string
+      status?: AcpToolCallStatus
+      content?: any
+      isError?: boolean
+    }
 
 export interface AcpInitializeParams {
   protocolVersion: number
@@ -58,12 +95,17 @@ export interface AcpInitializeParams {
 
 export interface AcpInitializeResult {
   protocolVersion: number
-  serverInfo: {
+  agentInfo?: {
     name: string
     version: string
   }
-  serverCapabilities: {
-    loadSession: boolean
+  agentCapabilities?: {
+    loadSession?: boolean
+    promptCapabilities?: {
+      image?: boolean
+      audio?: boolean
+      embeddedContext?: boolean
+    }
   }
 }
 
@@ -101,6 +143,7 @@ export interface AcpSessionCancelParams {
 export interface AcpSessionUpdateParams {
   sessionId: string
   update: AcpSessionUpdate
+  sessionUpdate?: AcpSessionUpdate
 }
 
 // ==========================================
