@@ -17,6 +17,7 @@ export interface Agent {
   readonly status: AgentStatus
 
   send(content: ContentBlock[] | string): void
+  steer(content: ContentBlock[] | string): void
   cancel(reason?: string): void
   whenIdle(): Promise<void>
 }

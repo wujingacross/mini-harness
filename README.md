@@ -29,6 +29,11 @@ Mini Harness is a lightweight yet architecturally faithful reconstruction of the
    - Implements JSON-RPC 2.0 stdio protocol for native integration with **Zed** and modern ACP editors.
    - Multi-session multiplexing with structured streaming for reasoning, text, and rich tool-call execution cards.
 
+6. **System Resilience & Hardening**:
+   - Runtime Invariants Guard enforcing strict monotonic sequence ordering and event Deep Freezing.
+   - Mid-turn Steering (`<steering>`) for dynamic real-time human intervention.
+   - Cascading process group cancellation.
+
 ---
 
 ## 📂 Project Structure
@@ -47,6 +52,7 @@ mini-harness/
 │   │   ├── types.ts         # JSON-RPC 2.0 & ACP wire types + pure Codec
 │   │   ├── connection.ts    # Duplex NDJSON streaming connection
 │   │   └── bridge.ts        # AcpBridge microkernel gateway plugin
+│   ├── invariants/          # Runtime invariants guard & Deep Freeze immutability
 │   ├── system-prompt/       # Ordered section prompt assembly & tool schema providers
 │   ├── tools/               # Tool registry & tools/execute waterfall pipeline
 │   │   └── bash.ts          # Model-facing bash tool definition
@@ -57,7 +63,7 @@ mini-harness/
 │   ├── llm/                 # Model adapters (Mock LLM + Real DeepSeek SSE adapter)
 │   │   ├── deepseek.ts      # Real DeepSeek API SSE streaming & Function Calling
 │   │   └── index.ts         # ctx.llm service
-│   ├── agent/               # Agent registry & global lifecycle events
+│   ├── agent/               # Agent registry & global lifecycle events (+ steer / cancel)
 │   ├── agent-loop/          # ReAct Loop state machine (+ resumeAgent support)
 │   ├── ui/                  # Interactive stdio CLI with ANSI streaming rendering
 │   └── demo/
@@ -68,14 +74,18 @@ mini-harness/
 │   ├── 01-milestone1-echo-agent.md
 │   ├── 02-milestone2-coding-agent.md
 │   ├── 03-milestone3-session-persistence.md
-│   └── 04-milestone4-acp-ide-integration.md
-├── tests/                   # Automated test suites (16 tests passing)
+│   ├── 04-milestone4-acp-ide-integration.md
+│   └── 05-milestone5-resilience-and-hardening.md
+├── tests/                   # Automated test suites (21 tests passing)
 │   ├── echo.spec.ts         # ReAct loop test
 │   ├── bash.spec.ts         # Bash executor & safety tests
 │   ├── deepseek-adapter.spec.ts # DeepSeek protocol serialization tests
 │   ├── session-persistence.spec.ts # JSONL / SQLite backends contract test
 │   ├── resume.spec.ts       # End-to-end cross-process resume test
-│   └── acp.spec.ts          # ACP IDE protocol bridge test
+│   ├── acp.spec.ts          # ACP IDE protocol bridge test
+│   ├── invariants.spec.ts   # Invariants guard & immutability test
+│   ├── steering.spec.ts     # Mid-turn steering test
+│   └── cancellation.spec.ts # Graceful cancellation test
 ├── package.json
 └── tsconfig.json
 ```
@@ -117,13 +127,13 @@ Add to Zed's `settings.json`:
 
 ---
 
-## 🗺️ Roadmap & Milestones
+## 🗺️ Roadmap & Milestones (100% Completed!)
 
 - [x] **Milestone 1**: Foundation & Echo Agent (Microkernel, Event Sourcing, ReAct Loop, Stdio CLI)
 - [x] **Milestone 2**: Coding Agent Core (DeepSeek API SSE Adapter + Local Bash Process Group Executor)
 - [x] **Milestone 3**: Industrial Persistence (JSONL / SQLite append logs, Crash Recovery, `ctx.agentLoop.resumeAgent()`)
 - [x] **Milestone 4**: Editor Integration (ACP - Agent Client Protocol JSON-RPC for Zed/IDE)
-- [ ] **Milestone 5**: Hardening (Invariants contract verification, Cancellation, Mid-turn Steering)
+- [x] **Milestone 5**: Hardening (Invariants contract verification, Cancellation, Mid-turn Steering)
 
 ---
 
@@ -133,3 +143,4 @@ Add to Zed's `settings.json`:
 * 📖 [Milestone 2 Coding Agent & Bash Capability Guide](docs/02-milestone2-coding-agent.md)
 * 📖 [Milestone 3 Industrial Persistence & Crash Recovery Guide](docs/03-milestone3-session-persistence.md)
 * 📖 [Milestone 4 Modern IDE Integration & ACP Gateway Guide](docs/04-milestone4-acp-ide-integration.md)
+* 📖 [Milestone 5 System Resilience & Hardening Guide](docs/05-milestone5-resilience-and-hardening.md)

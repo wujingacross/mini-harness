@@ -32,6 +32,11 @@ Mini Harness 是 DeepSeek 官方 Coding Agent 产品（DeepSeek Code）底层架
    - 结构化分流推送深度思考流（`agent_thought_chunk`）、回复正文与富交互工具执行卡片（`tool_call` / `tool_call_update`）；
    - 支持历史会话即时重载与全量卡片回放（`session/load`）。
 
+6. **系统韧性与高级交互控制（Resilience & Hardening）**：
+   - 运行时不变量守卫（`Invariants Guard`）：序号单调性校验与事件不可变深度冻结（`Deep Freeze`），杜绝历史日志被篡改；
+   - 中途干预与航向纠偏（`Mid-turn Steering`）：允许用户在执行中途注入 `<steering>` 指令动态修正任务方向；
+   - 优雅级联取消（`Graceful Cancellation`）：进程组级联清理与状态机安全复位。
+
 ---
 
 ## 📂 项目结构概览
@@ -50,6 +55,7 @@ mini-harness/
 │   │   ├── types.ts         # JSON-RPC 2.0 与 ACP 协议类型定义及 Codec
 │   │   ├── connection.ts    # 健壮的 NDJSON 行级分帧与双工通信连接
 │   │   └── bridge.ts        # AcpBridge 网关微内核服务
+│   ├── invariants/          # 运行时不变量守卫 (序号连续性断言 + Deep Freeze 深度冻结)
 │   ├── system-prompt/       # 提示词按优先级分段装配与 Tool Schema 注册
 │   ├── tools/               # 工具注册表与 tools/execute Waterfall 拦截流水线
 │   │   └── bash.ts          # 面向大模型的标准 bash 工具
@@ -60,7 +66,7 @@ mini-harness/
 │   ├── llm/                 # 统一模型服务抽象层 (Mock 适配器 + 真实 DeepSeek SSE 适配器)
 │   │   ├── deepseek.ts      # 真实 DeepSeek API 流式调用与 Function Calling
 │   │   └── index.ts         # ctx.llm 服务
-│   ├── agent/               # Agent 接口规范、注册表与全局生命周期事件
+│   ├── agent/               # Agent 接口规范、注册表与全局生命周期事件 (含 steer / cancel)
 │   ├── agent-loop/          # ReAct Loop 核心状态机 (Turn -> Step -> Tool 调度 + resumeAgent 恢复)
 │   ├── ui/                  # 终端 Stdio 交互界面 (打字机流式输出与彩色卡片)
 │   └── demo/
@@ -71,14 +77,18 @@ mini-harness/
 │   ├── 01-milestone1-echo-agent.md
 │   ├── 02-milestone2-coding-agent.md
 │   ├── 03-milestone3-session-persistence.md
-│   └── 04-milestone4-acp-ide-integration.md
-├── tests/                   # 自动化测试套件 (16 个测试全部绿灯通过)
+│   ├── 04-milestone4-acp-ide-integration.md
+│   └── 05-milestone5-resilience-and-hardening.md
+├── tests/                   # 自动化测试套件 (21 个测试全部绿灯通过)
 │   ├── echo.spec.ts         # ReAct 循环状态机测试
 │   ├── bash.spec.ts         # Bash 执行器与安全特性测试
 │   ├── deepseek-adapter.spec.ts # DeepSeek 协议解析测试
 │   ├── session-persistence.spec.ts # JSONL / SQLite 双后端契约测试
 │   ├── resume.spec.ts       # 跨进程持久化与无缝断点续聊测试
-│   └── acp.spec.ts          # ACP 协议网关与 IDE 交互测试
+│   ├── acp.spec.ts          # ACP 协议网关与 IDE 交互测试
+│   ├── invariants.spec.ts   # 运行时不变量守卫与不可变冻结测试
+│   ├── steering.spec.ts     # Mid-turn Steering 动态纠偏测试
+│   └── cancellation.spec.ts # 优雅取消与级联清理测试
 ├── package.json
 └── tsconfig.json
 ```
@@ -97,7 +107,7 @@ pnpm install
 pnpm test
 ```
 
-### 3. 体验 Demo
+### 3. 体验各种模式 Demo
 
 #### 方式 A：运行离线 Echo Agent (无需 API Key)
 ```bash
@@ -125,20 +135,21 @@ pnpm run demo:coding
 
 ---
 
-## 🗺️ 阶段路线图 (Roadmap)
+## 🗺️ 阶段路线图 (Roadmap) - 100% 全部达成！
 
 - [x] **Milestone 1**: 骨架、内核与最简 Echo Agent 闭环（Cordis 容器、事件溯源 Session、ReAct 状态机、Stdio CLI）
 - [x] **Milestone 2**: 真实能力注入（真实 DeepSeek API SSE 适配器 + 本地 Bash 进程组执行器 + Coding Agent）
 - [x] **Milestone 3**: 工业级持久化（JSONL / SQLite 追加日志、崩溃恢复修补与 `ctx.agentLoop.resumeAgent()`）
 - [x] **Milestone 4**: 现代化 IDE 接入（基于 JSON-RPC 的 ACP - Agent Client Protocol，对接 Zed 编辑器）
-- [ ] **Milestone 5**: 系统韧性与高级控制（Invariants 不变量契约校验、中途打断 Steering、优雅取消 Cancellation）
+- [x] **Milestone 5**: 系统韧性与高级控制（Invariants 不变量契约校验、中途打断 Steering、优雅取消 Cancellation 与生产收尾）
 
 ---
 
-## 📚 详细设计文档
+## 📚 详细设计文档全集
 
 每个阶段的技术细节、时序图与设计决策已沉淀在文档中：
 * 📖 [Milestone 1 详细架构设计与实现指南](docs/01-milestone1-echo-agent.md)
 * 📖 [Milestone 2 真实 DeepSeek 接入与本地 Bash 执行器指南](docs/02-milestone2-coding-agent.md)
 * 📖 [Milestone 3 工业级持久化、双后端与崩溃恢复指南](docs/03-milestone3-session-persistence.md)
 * 📖 [Milestone 4 现代化 IDE 接入与 ACP 协议网关指南](docs/04-milestone4-acp-ide-integration.md)
+* 📖 [Milestone 5 系统韧性、Invariants 不变量与高级控制指南](docs/05-milestone5-resilience-and-hardening.md)
