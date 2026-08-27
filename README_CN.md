@@ -171,3 +171,9 @@ pnpm run demo:coding
 * 📖 [Milestone 3 工业级持久化、双后端与崩溃恢复指南](docs/03-milestone3-session-persistence.md)
 * 📖 [Milestone 4 现代化 IDE 接入与 ACP 协议网关指南](docs/04-milestone4-acp-ide-integration.md)
 * 📖 [Milestone 5 系统韧性、Invariants 不变量与高级控制指南](docs/05-milestone5-resilience-and-hardening.md)
+
+---
+
+## ⚖️ 免责声明 (Disclaimer)
+
+**Mini Harness** 是一个由社区发起的独立教学与技术研究开源项目，旨在探索与传播微内核 Coding Agent 的底层架构设计。本项目非 DeepSeek 官方产品，与 DeepSeek AI 官方无任何商业隶属或背书关系。

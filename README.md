@@ -160,3 +160,9 @@ Add to Zed's `settings.json`:
 * 📖 [Milestone 3 Industrial Persistence & Crash Recovery Guide](docs/03-milestone3-session-persistence.md)
 * 📖 [Milestone 4 Modern IDE Integration & ACP Gateway Guide](docs/04-milestone4-acp-ide-integration.md)
 * 📖 [Milestone 5 System Resilience & Hardening Guide](docs/05-milestone5-resilience-and-hardening.md)
+
+---
+
+## ⚖️ Disclaimer
+
+**Mini Harness** is an independent, educational open-source project created for technical research and architectural learning purposes. It is not an official product of DeepSeek AI, and is not affiliated with, endorsed by, or associated with DeepSeek AI.
