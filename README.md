@@ -1,10 +1,35 @@
-# Mini Harness
+# Mini Harness (DeepSeek Harness / dsh Educational Reconstruction)
 
 [English](README.md) | [简体中文](README_CN.md)
 
-> A clean-room, educational implementation of the **DeepSeek Coding Agent** infrastructure (reconstructed from `deepseek-harness`).
+<p align="center">
+  <a href="https://github.com/wujingacross/mini-harness"><img src="https://img.shields.io/badge/GitHub-mini--harness-blue?logo=github" alt="GitHub"></a>
+  <a href="https://github.com/wujingacross/mini-harness/releases"><img src="https://img.shields.io/badge/Release-v1.0.0-green" alt="Release"></a>
+  <a href="https://github.com/wujingacross/mini-harness/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow" alt="License"></a>
+  <a href="https://api.deepseek.com"><img src="https://img.shields.io/badge/LLM-DeepSeek--V3%20%7C%20DeepSeek--R1-4D6BFE" alt="DeepSeek"></a>
+  <a href="https://zed.dev"><img src="https://img.shields.io/badge/Protocol-ACP%20(Zed%20Editor)-orange" alt="ACP"></a>
+  <a href="https://cordis.moe"><img src="https://img.shields.io/badge/Framework-Cordis%204%20Microkernel-purple" alt="Cordis"></a>
+</p>
 
-Mini Harness is a lightweight yet architecturally faithful reconstruction of the foundation behind **DeepSeek Code**. It demonstrates how to build a production-grade coding agent framework from the ground up using **Microkernel Architecture (Cordis)**, **Capability Seams**, **Event-Sourced Sessions**, and a robust **ReAct Agent Loop**.
+> 🚀 A clean-room, educational reconstruction of **DeepSeek Harness (`deepseek-harness` / `dsh` / DeepSeek Code)** coding agent framework.
+
+**Mini Harness** is an architectural faithful, clean-room reconstruction of the core foundation behind **DeepSeek Code** (the official **`deepseek-harness`** monorepo). It demonstrates how to build a production-grade coding agent framework from the ground up using **Microkernel Architecture (Cordis 4)**, **Capability Seams**, **Event-Sourced Sessions**, and **ACP (Agent Client Protocol)**.
+
+---
+
+## 🗺️ Mapping with Official `deepseek-harness (dsh)` Packages
+
+Mini Harness maps the multi-package complexity of official `@deepseek-ai/dsh-*` into an accessible single-package architecture without losing core design rigor:
+
+| Official `deepseek-harness` Package | Mini Harness Module | Core Architectural Responsibility |
+| :--- | :--- | :--- |
+| `@deepseek-ai/dsh-agent-loop` | [`src/agent-loop/`](src/agent-loop/) | ReAct Loop state machine (Turn ➔ Step ➔ Tool execution) |
+| `@deepseek-ai/dsh-session` | [`src/session/`](src/session/) | Event-sourced session store, `deriveMessages` projection & repair |
+| `@deepseek-ai/dsh-session-persistence` | [`src/session-persistence/`](src/session-persistence/) | Write-Behind buffer with JSONL / SQLite backends |
+| `@deepseek-ai/dsh-acp` | [`src/acp/`](src/acp/) | JSON-RPC 2.0 stdio gateway connecting **Zed** & ACP editors |
+| `@deepseek-ai/dsh-llm-deepseek` | [`src/llm/deepseek.ts`](src/llm/deepseek.ts) | DeepSeek API SSE streaming & R1 reasoning extraction |
+| `@deepseek-ai/dsh-tool-bash` / `bash-local` | [`src/bash/`](src/bash/) & [`src/tools/bash.ts`](src/tools/bash.ts) | Process group isolation (`detached`), timeout escalation & 64KB truncation |
+| `@deepseek-ai/dsh-invariants` | [`src/invariants/`](src/invariants/) | Runtime state machine invariant assertions & Deep Freeze immutability |
 
 ---
 
@@ -70,22 +95,13 @@ mini-harness/
 │       ├── echo.ts          # Milestone 1: Echo Agent Demo
 │       ├── coding.ts        # Milestone 2 & 3: Real Coding Agent with Persistence & Resume
 │       └── acp.ts           # Milestone 4: Production ACP Server for Zed / IDE
-├── docs/                    # Architecture & implementation tutorials
+├── docs/                    # Architecture & implementation tutorials (Milestones 1-5)
 │   ├── 01-milestone1-echo-agent.md
 │   ├── 02-milestone2-coding-agent.md
 │   ├── 03-milestone3-session-persistence.md
 │   ├── 04-milestone4-acp-ide-integration.md
 │   └── 05-milestone5-resilience-and-hardening.md
 ├── tests/                   # Automated test suites (21 tests passing)
-│   ├── echo.spec.ts         # ReAct loop test
-│   ├── bash.spec.ts         # Bash executor & safety tests
-│   ├── deepseek-adapter.spec.ts # DeepSeek protocol serialization tests
-│   ├── session-persistence.spec.ts # JSONL / SQLite backends contract test
-│   ├── resume.spec.ts       # End-to-end cross-process resume test
-│   ├── acp.spec.ts          # ACP IDE protocol bridge test
-│   ├── invariants.spec.ts   # Invariants guard & immutability test
-│   ├── steering.spec.ts     # Mid-turn steering test
-│   └── cancellation.spec.ts # Graceful cancellation test
 ├── package.json
 └── tsconfig.json
 ```

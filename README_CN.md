@@ -1,10 +1,37 @@
-# Mini Harness (轻量级 Coding Agent 框架)
+# Mini Harness (DeepSeek Harness / dsh 极简架构复现实战)
 
 [English](README.md) | [简体中文](README_CN.md)
 
-> 一个从 0 到 1 纯手写复现 **DeepSeek Coding Agent** 核心架构（`deepseek-harness`）的教学与实战项目。
+<p align="center">
+  <a href="https://github.com/wujingacross/mini-harness"><img src="https://img.shields.io/badge/GitHub-mini--harness-blue?logo=github" alt="GitHub"></a>
+  <a href="https://github.com/wujingacross/mini-harness/releases"><img src="https://img.shields.io/badge/Release-v1.0.0-green" alt="Release"></a>
+  <a href="https://github.com/wujingacross/mini-harness/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow" alt="License"></a>
+  <a href="https://api.deepseek.com"><img src="https://img.shields.io/badge/LLM-DeepSeek--V3%20%7C%20DeepSeek--R1-4D6BFE" alt="DeepSeek"></a>
+  <a href="https://zed.dev"><img src="https://img.shields.io/badge/Protocol-ACP%20(Zed%20Editor)-orange" alt="ACP"></a>
+  <a href="https://cordis.moe"><img src="https://img.shields.io/badge/Framework-Cordis%204%20Microkernel-purple" alt="Cordis"></a>
+</p>
 
-Mini Harness 是 DeepSeek 官方 Coding Agent 产品（DeepSeek Code）底层架构的轻量级、无冗余的 Clean-room 重建版本。本项目旨在用最清晰的代码结构，完整展现如何利用 **微内核架构（Cordis）**、**事件溯源（Event Sourcing）** 以及 **ReAct Agent Loop 状态机** 构建一个工业级的 Coding Agent。
+> 🚀 一个从 0 到 1 纯手写复现 **DeepSeek Harness (`deepseek-harness` / `dsh` / DeepSeek Code)** 核心架构的教学与实战项目。
+
+**Mini Harness** 是 DeepSeek 官方 Coding Agent 产品（**DeepSeek Code** / **`deepseek-harness`**）底层核心架构的轻量级、无冗余的 Clean-room 重建版本。
+
+本项目旨在用最清晰的代码结构、详尽的中文架构解析与完整的测试套件，完整展现如何利用 **微内核架构（Cordis 4）**、**事件溯源（Event Sourcing）**、**ReAct Loop 状态机** 以及 **ACP（Agent Client Protocol）协议** 构建一个工业级的 AI 编程智能体框架。
+
+---
+
+## 🗺️ 与官方 `deepseek-harness (dsh)` 模块映射
+
+Mini Harness 将官方 Monorepo 中庞杂的 `@deepseek-ai/dsh-*` 多包体系高度凝练为直观的单包架构，同时 100% 保留了其核心设计精髓：
+
+| 官方 `deepseek-harness` 模块 | Mini Harness 对应实现 | 核心架构职责 |
+| :--- | :--- | :--- |
+| `@deepseek-ai/dsh-agent-loop` | [`src/agent-loop/`](src/agent-loop/) | ReAct Loop 核心状态机（Turn ➔ Step ➔ Tool 驱动循环） |
+| `@deepseek-ai/dsh-session` | [`src/session/`](src/session/) | 事件溯源会话系统、`deriveMessages` 投影与崩溃恢复 |
+| `@deepseek-ai/dsh-session-persistence` | [`src/session-persistence/`](src/session-persistence/) | Write-Behind 缓冲池与 JSONL / SQLite 双持久化后端 |
+| `@deepseek-ai/dsh-acp` | [`src/acp/`](src/acp/) | JSON-RPC 2.0 双工网关，连接 **Zed** 等现代 IDE 编辑器 |
+| `@deepseek-ai/dsh-llm-deepseek` | [`src/llm/deepseek.ts`](src/llm/deepseek.ts) | 真实 DeepSeek API SSE 流式协议与 R1 思考流解析 |
+| `@deepseek-ai/dsh-tool-bash` / `bash-local` | [`src/bash/`](src/bash/) & [`src/tools/bash.ts`](src/tools/bash.ts) | Bash 进程组隔离（`detached`）、超时强杀与 64KB 截断保护 |
+| `@deepseek-ai/dsh-invariants` | [`src/invariants/`](src/invariants/) | 运行时状态机不变量校验守卫与事件 `Deep Freeze` 冻结 |
 
 ---
 
@@ -73,22 +100,13 @@ mini-harness/
 │       ├── echo.ts          # Milestone 1: 最简 Echo Agent Demo
 │       ├── coding.ts        # Milestone 2 & 3: 具备持久化与断点续聊的终端 Coding Agent
 │       └── acp.ts           # Milestone 4: 面向 Zed / IDE 的生产级 ACP Server 服务
-├── docs/                    # 分阶段演进与架构设计过程文档
+├── docs/                    # 分阶段演进与架构设计过程文档 (全套 5 篇教程)
 │   ├── 01-milestone1-echo-agent.md
 │   ├── 02-milestone2-coding-agent.md
 │   ├── 03-milestone3-session-persistence.md
 │   ├── 04-milestone4-acp-ide-integration.md
 │   └── 05-milestone5-resilience-and-hardening.md
 ├── tests/                   # 自动化测试套件 (21 个测试全部绿灯通过)
-│   ├── echo.spec.ts         # ReAct 循环状态机测试
-│   ├── bash.spec.ts         # Bash 执行器与安全特性测试
-│   ├── deepseek-adapter.spec.ts # DeepSeek 协议解析测试
-│   ├── session-persistence.spec.ts # JSONL / SQLite 双后端契约测试
-│   ├── resume.spec.ts       # 跨进程持久化与无缝断点续聊测试
-│   ├── acp.spec.ts          # ACP 协议网关与 IDE 交互测试
-│   ├── invariants.spec.ts   # 运行时不变量守卫与不可变冻结测试
-│   ├── steering.spec.ts     # Mid-turn Steering 动态纠偏测试
-│   └── cancellation.spec.ts # 优雅取消与级联清理测试
 ├── package.json
 └── tsconfig.json
 ```

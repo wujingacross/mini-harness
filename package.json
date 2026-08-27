@@ -1,7 +1,7 @@
 {
   "name": "mini-harness",
   "version": "1.0.0",
-  "description": "Educational mini-harness reconstructed from deepseek-harness",
+  "description": "A clean-room, educational reconstruction of DeepSeek Harness (deepseek-harness / dsh / DeepSeek Code) coding agent framework.",
   "type": "module",
   "scripts": {
     "demo:echo": "tsx src/demo/echo.ts",
@@ -9,6 +9,28 @@
     "demo:acp": "tsx src/demo/acp.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "deepseek-code",
+    "coding-agent",
+    "ai-agent",
+    "agent-client-protocol",
+    "acp",
+    "cordis",
+    "microkernel",
+    "event-sourcing",
+    "react-loop",
+    "zed",
+    "typescript"
+  ],
+  "author": "wujingacross",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wujingacross/mini-harness.git"
   },
   "dependencies": {
     "cordis": "4.0.0-rc.8"
