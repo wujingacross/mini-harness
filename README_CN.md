@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/wujingacross/mini-harness"><img src="https://img.shields.io/badge/GitHub-mini--harness-blue?logo=github" alt="GitHub"></a>
-  <a href="https://github.com/wujingacross/mini-harness/releases"><img src="https://img.shields.io/badge/Release-v1.0.0-green" alt="Release"></a>
+  <a href="https://github.com/wujingacross/mini-harness/releases"><img src="https://img.shields.io/badge/Release-v1.1.0-green" alt="Release"></a>
   <a href="https://github.com/wujingacross/mini-harness/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow" alt="License"></a>
   <a href="https://api.deepseek.com"><img src="https://img.shields.io/badge/LLM-DeepSeek--V3%20%7C%20DeepSeek--R1-4D6BFE" alt="DeepSeek"></a>
   <a href="https://zed.dev"><img src="https://img.shields.io/badge/Protocol-ACP%20(Zed%20Editor)-orange" alt="ACP"></a>
@@ -15,7 +15,7 @@
 
 **Mini Harness** 是 DeepSeek 官方 Coding Agent 产品（**DeepSeek Code** / **`deepseek-harness`**）底层核心架构的轻量级、无冗余的 Clean-room 重建版本。
 
-本项目旨在用最清晰的代码结构、详尽的中文架构解析与完整的测试套件，完整展现如何利用 **微内核架构（Cordis 4）**、**事件溯源（Event Sourcing）**、**ReAct Loop 状态机** 以及 **ACP（Agent Client Protocol）协议** 构建一个工业级的 AI 编程智能体框架。
+本项目旨在用最清晰的代码结构、详尽的中文架构解析与完整的测试套件，完整展现如何利用 **微内核架构（Cordis 4）**、**事件溯源（Event Sourcing）**、**ReAct Loop 状态机**、**专业代码读写工具链** 以及 **ACP（Agent Client Protocol）协议** 构建一个工业级的 AI 编程智能体框架。
 
 ---
 
@@ -28,6 +28,8 @@ Mini Harness 将官方 Monorepo 中庞杂的 `@deepseek-ai/dsh-*` 多包体系�
 | `@deepseek-ai/dsh-agent-loop` | [`src/agent-loop/`](src/agent-loop/) | ReAct Loop 核心状态机（Turn ➔ Step ➔ Tool 驱动循环） |
 | `@deepseek-ai/dsh-session` | [`src/session/`](src/session/) | 事件溯源会话系统、`deriveMessages` 投影与崩溃恢复 |
 | `@deepseek-ai/dsh-session-persistence` | [`src/session-persistence/`](src/session-persistence/) | Write-Behind 缓冲池与 JSONL / SQLite 双持久化后端 |
+| `@deepseek-ai/dsh-tool-fs` / `tool-str-replace-editor` | [`src/tools/file.ts`](src/tools/file.ts) | `view_file` 切片查看、`replace_file_content` 精确局部替换、`write_to_file` |
+| `@deepseek-ai/dsh-tool-fs-search` | [`src/tools/search.ts`](src/tools/search.ts) | `find_by_name` Glob 文件查找、`grep_search` 正则代码检索 |
 | `@deepseek-ai/dsh-acp` | [`src/acp/`](src/acp/) | JSON-RPC 2.0 双工网关，连接 **Zed** 等现代 IDE 编辑器 |
 | `@deepseek-ai/dsh-llm-deepseek` | [`src/llm/deepseek.ts`](src/llm/deepseek.ts) | 真实 DeepSeek API SSE 流式协议与 R1 思考流解析 |
 | `@deepseek-ai/dsh-tool-bash` / `bash-local` | [`src/bash/`](src/bash/) & [`src/tools/bash.ts`](src/tools/bash.ts) | Bash 进程组隔离（`detached`）、超时强杀与 64KB 截断保护 |
@@ -41,11 +43,12 @@ Mini Harness 将官方 Monorepo 中庞杂的 `@deepseek-ai/dsh-*` 多包体系�
    - 基于 Cordis 微内核容器构建。所有的核心能力（`ctx.llm` 模型服务、`ctx.sessions` 会话存储、`ctx.sessionPersistence` 持久化、`ctx.tools` 工具流水线、`ctx.systemPrompt` 提示词装配、`ctx.bash` 本地执行器、`ctx.acpBridge` IDE 网关、`ctx.agents` Agent 注册表、`ctx.agentLoop` 循环引擎）都是解耦的独立插件。
    - 横切关注点（如用户权限二次确认、Docker 沙箱隔离、事件流审计、状态机不变式检查）均通过 Cordis 的 `waterfall` 中间件拦截注入，**无需修改主循环代码**。
 
-2. **能力 Seam 架构（Interface ➔ Implementation ➔ Consumer）**：
-   - 以 Bash 执行能力与持久化存储为例，彻底解耦抽象接口、具体后端（Local/JSONL/SQLite）与大模型工具。随时支持热插拔替换为容器沙箱或远程执行后端。
+2. **专业代码读写与检索工具链（Dedicated Code & Search Tools）**：
+   - 提供 `view_file`（行号切片查看，规避上下文溢出）、`replace_file_content`（唯一性匹配局部修改，自带 Diff 预览）与 `write_to_file`（递归新建文件）；
+   - 提供 `find_by_name`（Glob 快速定位文件）与 `grep_search`（正则跨文件检索代码）。
 
 3. **事件溯源会话系统（Event-Sourced Session Log）**：
-   - 采用**单向追加的事件日志（Append-only Event Log）**作为唯一事实来源（`turn/start`, `assistant/chunk`, `tool/call`, `tool/result`, `context/message`, `turn/end`）。
+   - 采用**单向追加的事件日志（Append-only Event Log）**作为唯一事实来源。
    - 在每次向大模型发起请求前，通过纯函数 `deriveMessages()` 从事件流中**动态投影计算**出标准的消息数组。天然具备崩溃恢复、断点重放、会话分支（Fork）能力。
 
 4. **工业级持久化与智能崩溃恢复（Persistence & Crash Recovery）**：
@@ -56,8 +59,7 @@ Mini Harness 将官方 Monorepo 中庞杂的 `@deepseek-ai/dsh-*` 多包体系�
 5. **现代化 IDE 原生接入（Agent Client Protocol - ACP）**：
    - 基于 JSON-RPC 2.0 stdio 双工协议构建，原生支持接入 **Zed** 等现代化编辑器；
    - 多会话多任务并发多路复用（Multi-Session Multiplexing）；
-   - 结构化分流推送深度思考流（`agent_thought_chunk`）、回复正文与富交互工具执行卡片（`tool_call` / `tool_call_update`）；
-   - 支持历史会话即时重载与全量卡片回放（`session/load`）。
+   - 结构化分流推送深度思考流（`agent_thought_chunk`）、回复正文与富交互工具执行卡片（`tool_call` / `tool_call_update`）。
 
 6. **系统韧性与高级交互控制（Resilience & Hardening）**：
    - 运行时不变量守卫（`Invariants Guard`）：序号单调性校验与事件不可变深度冻结（`Deep Freeze`），杜绝历史日志被篡改；
@@ -74,39 +76,41 @@ mini-harness/
 │   ├── types/               # 核心类型词表 (ContentBlocks, StreamChunks, SessionEvents, SessionHeader)
 │   ├── session/             # 事件溯源会话存储与消息派生 (deriveMessages 投影 + 崩溃修复 repair)
 │   ├── session-persistence/ # 工业级会话持久化 Seam 架构 (Write-Behind 缓冲池 + 检查点)
-│   │   ├── types.ts         # SessionPersistenceService 抽象契约
-│   │   ├── base.ts          # SessionPersistence 基础服务类
-│   │   ├── jsonl.ts         # JSONL 增量文本文件存储后端
-│   │   └── sqlite.ts        # Node 24 原生 node:sqlite 关系型数据库存储后端
 │   ├── acp/                 # 现代化 IDE 接入网关 (Agent Client Protocol - ACP)
-│   │   ├── types.ts         # JSON-RPC 2.0 与 ACP 协议类型定义及 Codec
-│   │   ├── connection.ts    # 健壮的 NDJSON 行级分帧与双工通信连接
-│   │   └── bridge.ts        # AcpBridge 网关微内核服务
 │   ├── invariants/          # 运行时不变量守卫 (序号连续性断言 + Deep Freeze 深度冻结)
 │   ├── system-prompt/       # 提示词按优先级分段装配与 Tool Schema 注册
 │   ├── tools/               # 工具注册表与 tools/execute Waterfall 拦截流水线
-│   │   └── bash.ts          # 面向大模型的标准 bash 工具
+│   │   ├── bash.ts          # 面向大模型的标准 bash 工具 (进程组安全)
+│   │   ├── file.ts          # 【新增】view_file / replace_file_content / write_to_file
+│   │   └── search.ts        # 【新增】find_by_name / grep_search
 │   ├── bash/                # Bash 执行能力 Seam 架构 (Interface + Local 进程组实现)
-│   │   ├── types.ts         # BashExecutor 抽象定义与结果结构
-│   │   ├── local.ts         # 本地进程组隔离、超时强杀与 64KB 截断保护
-│   │   └── index.ts         # ctx.bash 微内核服务
 │   ├── llm/                 # 统一模型服务抽象层 (Mock 适配器 + 真实 DeepSeek SSE 适配器)
-│   │   ├── deepseek.ts      # 真实 DeepSeek API 流式调用与 Function Calling
-│   │   └── index.ts         # ctx.llm 服务
 │   ├── agent/               # Agent 接口规范、注册表与全局生命周期事件 (含 steer / cancel)
 │   ├── agent-loop/          # ReAct Loop 核心状态机 (Turn -> Step -> Tool 调度 + resumeAgent 恢复)
 │   ├── ui/                  # 终端 Stdio 交互界面 (打字机流式输出与彩色卡片)
 │   └── demo/
 │       ├── echo.ts          # Milestone 1: 最简 Echo Agent Demo
-│       ├── coding.ts        # Milestone 2 & 3: 具备持久化与断点续聊的终端 Coding Agent
-│       └── acp.ts           # Milestone 4: 面向 Zed / IDE 的生产级 ACP Server 服务
-├── docs/                    # 分阶段演进与架构设计过程文档 (全套 5 篇教程)
+│       ├── coding.ts        # Milestone 2, 3 & 6: 具备持久化与全套读写工具的终端 Coding Agent
+│       └── acp.ts           # Milestone 4 & 6: 面向 Zed / IDE 的全功能 ACP Server 服务
+├── docs/                    # 分阶段演进与架构设计过程文档 (全套 6 篇教程)
 │   ├── 01-milestone1-echo-agent.md
 │   ├── 02-milestone2-coding-agent.md
 │   ├── 03-milestone3-session-persistence.md
 │   ├── 04-milestone4-acp-ide-integration.md
-│   └── 05-milestone5-resilience-and-hardening.md
-├── tests/                   # 自动化测试套件 (21 个测试全部绿灯通过)
+│   ├── 05-milestone5-resilience-and-hardening.md
+│   └── 06-milestone6-code-editing-and-search-tools.md
+├── tests/                   # 自动化测试套件 (11 个测试套件，30 个单测全部绿灯通过)
+│   ├── echo.spec.ts         # ReAct 循环状态机测试
+│   ├── bash.spec.ts         # Bash 执行器与安全特性测试
+│   ├── file-tools.spec.ts   # 【新增】文件切片读写与局部精准替换测试
+│   ├── search-tools.spec.ts # 【新增】Glob 文件定位与正则代码检索测试
+│   ├── deepseek-adapter.spec.ts # DeepSeek 协议解析测试
+│   ├── session-persistence.spec.ts # JSONL / SQLite 双后端契约测试
+│   ├── resume.spec.ts       # 跨进程持久化与无缝断点续聊测试
+│   ├── acp.spec.ts          # ACP 协议网关与 IDE 交互测试
+│   ├── invariants.spec.ts   # 运行时不变量守卫与不可变冻结测试
+│   ├── steering.spec.ts     # Mid-turn Steering 动态纠偏测试
+│   └── cancellation.spec.ts # 优雅取消与级联清理测试
 ├── package.json
 └── tsconfig.json
 ```
@@ -153,13 +157,14 @@ pnpm run demo:coding
 
 ---
 
-## 🗺️ 阶段路线图 (Roadmap) - 100% 全部达成！
+## 🗺️ 阶段路线图 (Roadmap)
 
 - [x] **Milestone 1**: 骨架、内核与最简 Echo Agent 闭环（Cordis 容器、事件溯源 Session、ReAct 状态机、Stdio CLI）
 - [x] **Milestone 2**: 真实能力注入（真实 DeepSeek API SSE 适配器 + 本地 Bash 进程组执行器 + Coding Agent）
 - [x] **Milestone 3**: 工业级持久化（JSONL / SQLite 追加日志、崩溃恢复修补与 `ctx.agentLoop.resumeAgent()`）
 - [x] **Milestone 4**: 现代化 IDE 接入（基于 JSON-RPC 的 ACP - Agent Client Protocol，对接 Zed 编辑器）
-- [x] **Milestone 5**: 系统韧性与高级控制（Invariants 不变量契约校验、中途打断 Steering、优雅取消 Cancellation 与生产收尾）
+- [x] **Milestone 5**: 系统韧性与高级控制（Invariants 不变量契约校验、中途打断 Steering、优雅取消 Cancellation）
+- [x] **Milestone 6 (v1.1.0)**: 专业代码编辑与检索工具链（`view_file` 切片、`replace_file_content` 精准替换、`find_by_name`、`grep_search`）
 
 ---
 
@@ -171,6 +176,7 @@ pnpm run demo:coding
 * 📖 [Milestone 3 工业级持久化、双后端与崩溃恢复指南](docs/03-milestone3-session-persistence.md)
 * 📖 [Milestone 4 现代化 IDE 接入与 ACP 协议网关指南](docs/04-milestone4-acp-ide-integration.md)
 * 📖 [Milestone 5 系统韧性、Invariants 不变量与高级控制指南](docs/05-milestone5-resilience-and-hardening.md)
+* 📖 [Milestone 6 专业代码读写与检索工具链指南](docs/06-milestone6-code-editing-and-search-tools.md)
 
 ---
 

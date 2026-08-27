@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/wujingacross/mini-harness"><img src="https://img.shields.io/badge/GitHub-mini--harness-blue?logo=github" alt="GitHub"></a>
-  <a href="https://github.com/wujingacross/mini-harness/releases"><img src="https://img.shields.io/badge/Release-v1.0.0-green" alt="Release"></a>
+  <a href="https://github.com/wujingacross/mini-harness/releases"><img src="https://img.shields.io/badge/Release-v1.1.0-green" alt="Release"></a>
   <a href="https://github.com/wujingacross/mini-harness/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow" alt="License"></a>
   <a href="https://api.deepseek.com"><img src="https://img.shields.io/badge/LLM-DeepSeek--V3%20%7C%20DeepSeek--R1-4D6BFE" alt="DeepSeek"></a>
   <a href="https://zed.dev"><img src="https://img.shields.io/badge/Protocol-ACP%20(Zed%20Editor)-orange" alt="ACP"></a>
@@ -13,7 +13,7 @@
 
 > 🚀 A clean-room, educational reconstruction of **DeepSeek Harness (`deepseek-harness` / `dsh` / DeepSeek Code)** coding agent framework.
 
-**Mini Harness** is an architectural faithful, clean-room reconstruction of the core foundation behind **DeepSeek Code** (the official **`deepseek-harness`** monorepo). It demonstrates how to build a production-grade coding agent framework from the ground up using **Microkernel Architecture (Cordis 4)**, **Capability Seams**, **Event-Sourced Sessions**, and **ACP (Agent Client Protocol)**.
+**Mini Harness** is an architectural faithful, clean-room reconstruction of the core foundation behind **DeepSeek Code** (the official **`deepseek-harness`** monorepo). It demonstrates how to build a production-grade coding agent framework from the ground up using **Microkernel Architecture (Cordis 4)**, **Capability Seams**, **Event-Sourced Sessions**, **Dedicated Code Tools**, and **ACP (Agent Client Protocol)**.
 
 ---
 
@@ -26,6 +26,8 @@ Mini Harness maps the multi-package complexity of official `@deepseek-ai/dsh-*` 
 | `@deepseek-ai/dsh-agent-loop` | [`src/agent-loop/`](src/agent-loop/) | ReAct Loop state machine (Turn ➔ Step ➔ Tool execution) |
 | `@deepseek-ai/dsh-session` | [`src/session/`](src/session/) | Event-sourced session store, `deriveMessages` projection & repair |
 | `@deepseek-ai/dsh-session-persistence` | [`src/session-persistence/`](src/session-persistence/) | Write-Behind buffer with JSONL / SQLite backends |
+| `@deepseek-ai/dsh-tool-fs` / `tool-str-replace-editor` | [`src/tools/file.ts`](src/tools/file.ts) | `view_file` line slicing, `replace_file_content` surgical editing, `write_to_file` |
+| `@deepseek-ai/dsh-tool-fs-search` | [`src/tools/search.ts`](src/tools/search.ts) | `find_by_name` glob search, `grep_search` regex code search |
 | `@deepseek-ai/dsh-acp` | [`src/acp/`](src/acp/) | JSON-RPC 2.0 stdio gateway connecting **Zed** & ACP editors |
 | `@deepseek-ai/dsh-llm-deepseek` | [`src/llm/deepseek.ts`](src/llm/deepseek.ts) | DeepSeek API SSE streaming & R1 reasoning extraction |
 | `@deepseek-ai/dsh-tool-bash` / `bash-local` | [`src/bash/`](src/bash/) & [`src/tools/bash.ts`](src/tools/bash.ts) | Process group isolation (`detached`), timeout escalation & 64KB truncation |
@@ -39,8 +41,10 @@ Mini Harness maps the multi-package complexity of official `@deepseek-ai/dsh-*` 
    - Built on top of the Cordis microkernel. Core services (`ctx.llm`, `ctx.sessions`, `ctx.sessionPersistence`, `ctx.acpBridge`, `ctx.tools`, `ctx.systemPrompt`, `ctx.bash`, `ctx.agents`, `ctx.agentLoop`) are isolated plugins.
    - Cross-cutting concerns wrap around execution seams via Cordis `waterfall` without modifying core loops.
 
-2. **Capability Seam Architecture (Interface ➔ Implementation ➔ Consumer)**:
-   - Capability layers like Bash execution and Session Persistence decouple abstract interfaces, concrete backends (Local/JSONL/SQLite), and model tools.
+2. **Dedicated Code Editing & Search Toolchain**:
+   - `view_file`: Safe line-sliced file reading with line numbers;
+   - `replace_file_content`: Precise surgical string replacement with uniqueness validation and unified diff preview;
+   - `find_by_name` & `grep_search`: Fast codebase exploration excluding noise folders.
 
 3. **Event-Sourced Session Log**:
    - The single source of truth is an append-only sequence of typed events.
@@ -69,39 +73,41 @@ mini-harness/
 │   ├── types/               # Core vocabulary (ContentBlocks, StreamChunks, SessionEvents, SessionHeader)
 │   ├── session/             # Event-sourced session store & message projection (+ repair)
 │   ├── session-persistence/ # Session Persistence Seam (Write-Behind buffer + Checkpoints)
-│   │   ├── types.ts         # Abstract persistence service contract
-│   │   ├── base.ts          # Base persistence service class
-│   │   ├── jsonl.ts         # Append-only JSONL file storage backend
-│   │   └── sqlite.ts        # Node 24 native node:sqlite relational database backend
 │   ├── acp/                 # Agent Client Protocol (ACP) IDE Bridge
-│   │   ├── types.ts         # JSON-RPC 2.0 & ACP wire types + pure Codec
-│   │   ├── connection.ts    # Duplex NDJSON streaming connection
-│   │   └── bridge.ts        # AcpBridge microkernel gateway plugin
 │   ├── invariants/          # Runtime invariants guard & Deep Freeze immutability
 │   ├── system-prompt/       # Ordered section prompt assembly & tool schema providers
 │   ├── tools/               # Tool registry & tools/execute waterfall pipeline
-│   │   └── bash.ts          # Model-facing bash tool definition
+│   │   ├── bash.ts          # Model-facing bash tool definition
+│   │   ├── file.ts          # 【New】view_file, replace_file_content, write_to_file
+│   │   └── search.ts        # 【New】find_by_name, grep_search
 │   ├── bash/                # Bash Capability Seam (Interface + Local process group impl)
-│   │   ├── types.ts         # BashExecutor abstract contract & result types
-│   │   ├── local.ts         # Process group isolation, timeout kill, 64KB truncation
-│   │   └── index.ts         # ctx.bash service
 │   ├── llm/                 # Model adapters (Mock LLM + Real DeepSeek SSE adapter)
-│   │   ├── deepseek.ts      # Real DeepSeek API SSE streaming & Function Calling
-│   │   └── index.ts         # ctx.llm service
 │   ├── agent/               # Agent registry & global lifecycle events (+ steer / cancel)
 │   ├── agent-loop/          # ReAct Loop state machine (+ resumeAgent support)
 │   ├── ui/                  # Interactive stdio CLI with ANSI streaming rendering
 │   └── demo/
 │       ├── echo.ts          # Milestone 1: Echo Agent Demo
-│       ├── coding.ts        # Milestone 2 & 3: Real Coding Agent with Persistence & Resume
-│       └── acp.ts           # Milestone 4: Production ACP Server for Zed / IDE
-├── docs/                    # Architecture & implementation tutorials (Milestones 1-5)
+│       ├── coding.ts        # Milestone 2, 3 & 6: Real Coding Agent with Persistence, File & Search Tools
+│       └── acp.ts           # Milestone 4 & 6: Production ACP Server for Zed / IDE with File & Search Tools
+├── docs/                    # Architecture & implementation tutorials (Milestones 1-6)
 │   ├── 01-milestone1-echo-agent.md
 │   ├── 02-milestone2-coding-agent.md
 │   ├── 03-milestone3-session-persistence.md
 │   ├── 04-milestone4-acp-ide-integration.md
-│   └── 05-milestone5-resilience-and-hardening.md
-├── tests/                   # Automated test suites (21 tests passing)
+│   ├── 05-milestone5-resilience-and-hardening.md
+│   └── 06-milestone6-code-editing-and-search-tools.md
+├── tests/                   # Automated test suites (30 tests passing)
+│   ├── echo.spec.ts
+│   ├── bash.spec.ts
+│   ├── file-tools.spec.ts   # 【New】File line slicing & surgical replacement tests
+│   ├── search-tools.spec.ts # 【New】Glob & regex code search tests
+│   ├── deepseek-adapter.spec.ts
+│   ├── session-persistence.spec.ts
+│   ├── resume.spec.ts
+│   ├── acp.spec.ts
+│   ├── invariants.spec.ts
+│   ├── steering.spec.ts
+│   └── cancellation.spec.ts
 ├── package.json
 └── tsconfig.json
 ```
@@ -143,13 +149,14 @@ Add to Zed's `settings.json`:
 
 ---
 
-## 🗺️ Roadmap & Milestones (100% Completed!)
+## 🗺️ Roadmap & Milestones
 
 - [x] **Milestone 1**: Foundation & Echo Agent (Microkernel, Event Sourcing, ReAct Loop, Stdio CLI)
 - [x] **Milestone 2**: Coding Agent Core (DeepSeek API SSE Adapter + Local Bash Process Group Executor)
 - [x] **Milestone 3**: Industrial Persistence (JSONL / SQLite append logs, Crash Recovery, `ctx.agentLoop.resumeAgent()`)
 - [x] **Milestone 4**: Editor Integration (ACP - Agent Client Protocol JSON-RPC for Zed/IDE)
 - [x] **Milestone 5**: Hardening (Invariants contract verification, Cancellation, Mid-turn Steering)
+- [x] **Milestone 6 (v1.1.0)**: Dedicated Code Editing & Discovery Tools (`view_file`, `replace_file_content`, `find_by_name`, `grep_search`)
 
 ---
 
@@ -160,6 +167,7 @@ Add to Zed's `settings.json`:
 * 📖 [Milestone 3 Industrial Persistence & Crash Recovery Guide](docs/03-milestone3-session-persistence.md)
 * 📖 [Milestone 4 Modern IDE Integration & ACP Gateway Guide](docs/04-milestone4-acp-ide-integration.md)
 * 📖 [Milestone 5 System Resilience & Hardening Guide](docs/05-milestone5-resilience-and-hardening.md)
+* 📖 [Milestone 6 Code Editing & Search Toolchain Guide](docs/06-milestone6-code-editing-and-search-tools.md)
 
 ---
 

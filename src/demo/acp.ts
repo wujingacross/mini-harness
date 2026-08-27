@@ -7,6 +7,8 @@ import LlmService from '../llm/index.js'
 import { DeepSeekAdapter } from '../llm/deepseek.js'
 import BashService from '../bash/index.js'
 import { createBashTool } from '../tools/bash.js'
+import { createFileTools } from '../tools/file.js'
+import { createSearchTools } from '../tools/search.js'
 import { JsonlSessionPersistence } from '../session-persistence/jsonl.js'
 import AgentRegistry from '../agent/index.js'
 import AgentLoop from '../agent-loop/index.js'
@@ -50,23 +52,43 @@ async function main() {
     name: 'coding-identity',
     order: 0,
     text: `You are DeepSeek Code running as an ACP (Agent Client Protocol) server inside the user's IDE.
-You have access to the 'bash' tool to inspect workspace files, run tests, and search code.
-Always verify code changes with actual command runs.`,
+You have access to professional tools:
+- 'view_file': View file contents with line slicing and line numbers.
+- 'replace_file_content': Precisely replace exact unique target code with new content.
+- 'write_to_file': Create new files or overwrite existing files.
+- 'find_by_name': Find files matching glob/pattern across the project.
+- 'grep_search': Regex search for code and keywords across files.
+- 'bash': Execute terminal commands and run tests.
+
+Guidelines:
+1. Always prefer 'view_file' to inspect code before making modifications.
+2. Prefer 'replace_file_content' for surgical edits and 'write_to_file' for new files.
+3. Use 'grep_search' and 'find_by_name' to discover and explore project codebase efficiently.
+4. Use 'bash' to verify your changes with actual build/test commands.
+5. Provide concise, accurate, and direct responses.`,
   })
 
   // 4. 挂载真实 DeepSeek LLM 适配器
   const deepseekAdapter = new DeepSeekAdapter({ apiKey, baseURL })
   ctx.llm.registerAdapter([modelName, 'deepseek-chat', 'deepseek-reasoner', 'deepseek-coder'], deepseekAdapter)
 
-  // 5. 注册本地 Bash 工具
+  // 5. 注册本地 Bash、文件读写与搜索工具
   const bashTool = createBashTool(ctx)
   ctx.tools.register(bashTool)
+
+  for (const tool of createFileTools(ctx)) {
+    ctx.tools.register(tool)
+  }
+
+  for (const tool of createSearchTools(ctx)) {
+    ctx.tools.register(tool)
+  }
 
   // 6. 加载并启动 ACP 桥接网关 (绑定 process.stdin 与 process.stdout)
   await ctx.plugin(AcpBridge, {
     model: modelName,
     serverName: 'mini-harness-acp',
-    serverVersion: '0.4.0',
+    serverVersion: '1.1.0',
     input: process.stdin,
     output: process.stdout,
   })

@@ -1,6 +1,10 @@
 import { Context, Service } from 'cordis'
 import type { ToolSchema } from '../system-prompt/index.js'
 
+export * from './bash.js'
+export * from './file.js'
+export * from './search.js'
+
 export interface ToolDefinition<TArgs = any> {
   name: string
   description: string

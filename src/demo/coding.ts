@@ -7,6 +7,8 @@ import LlmService from '../llm/index.js'
 import { DeepSeekAdapter } from '../llm/deepseek.js'
 import BashService from '../bash/index.js'
 import { createBashTool } from '../tools/bash.js'
+import { createFileTools } from '../tools/file.js'
+import { createSearchTools } from '../tools/search.js'
 import { JsonlSessionPersistence } from '../session-persistence/jsonl.js'
 import AgentRegistry from '../agent/index.js'
 import AgentLoop from '../agent-loop/index.js'
@@ -51,22 +53,38 @@ async function main() {
   ctx.systemPrompt.section({
     name: 'coding-identity',
     order: 0,
-    text: `You are DeepSeek Code, an expert coding assistant built on the mini-harness framework.
-You have access to a powerful 'bash' tool to inspect files, edit code, search directory contents, and run tests.
+    text: `You are DeepSeek Code, an expert software engineering assistant built on the mini-harness framework.
+You have access to a suite of professional developer tools:
+- 'view_file': View file contents with line slicing and line numbers.
+- 'replace_file_content': Precisely replace exact unique target code with new content.
+- 'write_to_file': Create new files or overwrite existing files.
+- 'find_by_name': Find files matching glob/pattern across the project.
+- 'grep_search': Regex search for code and keywords across files.
+- 'bash': Execute terminal commands, run tests, and check git status.
 
 Guidelines:
-1. Always prefer using the 'bash' tool to explore the filesystem and verify your work directly.
-2. Specify 'workdir' when executing commands in subdirectories instead of relying on 'cd'.
-3. Provide concise, direct answers and confirm file modifications with actual test/build runs.`,
+1. Always prefer 'view_file' to inspect code before making modifications.
+2. Prefer 'replace_file_content' for surgical edits and 'write_to_file' for new files.
+3. Use 'grep_search' and 'find_by_name' to discover and explore project codebase efficiently.
+4. Use 'bash' to verify your changes with actual build/test commands.
+5. Provide concise, accurate, and direct responses.`,
   })
 
   // 4. 挂载真实 DeepSeek LLM 适配器
   const deepseekAdapter = new DeepSeekAdapter({ apiKey, baseURL })
   ctx.llm.registerAdapter([modelName, 'deepseek-chat', 'deepseek-reasoner', 'deepseek-coder'], deepseekAdapter)
 
-  // 5. 注册本地 Bash 工具
+  // 5. 注册全套代码与命令工具
   const bashTool = createBashTool(ctx)
   ctx.tools.register(bashTool)
+
+  for (const tool of createFileTools(ctx)) {
+    ctx.tools.register(tool)
+  }
+
+  for (const tool of createSearchTools(ctx)) {
+    ctx.tools.register(tool)
+  }
 
   // 6. 创建或恢复 Coding Agent 实例
   let agent
@@ -75,7 +93,7 @@ Guidelines:
     try {
       agent = await ctx.agentLoop.resumeAgent(resumeId, 'coding-agent', {
         model: modelName,
-        systemPrompt: 'Be proactive and use the bash tool to solve the user tasks.',
+        systemPrompt: 'Be proactive and use the dedicated file/search/bash tools to solve tasks.',
       })
       console.log(`\x1b[32m[Resume] Successfully resumed session with ${agent.session.events.length} historical events.\x1b[0m`)
     } catch (err: any) {
@@ -83,13 +101,13 @@ Guidelines:
       console.log('Falling back to fresh session...')
       agent = ctx.agentLoop.createAgent('coding-agent', {
         model: modelName,
-        systemPrompt: 'Be proactive and use the bash tool to solve the user tasks.',
+        systemPrompt: 'Be proactive and use the dedicated file/search/bash tools to solve tasks.',
       })
     }
   } else {
     agent = ctx.agentLoop.createAgent('coding-agent', {
       model: modelName,
-      systemPrompt: 'Be proactive and use the bash tool to solve the user tasks.',
+      systemPrompt: 'Be proactive and use the dedicated file/search/bash tools to solve tasks.',
     })
   }
 
