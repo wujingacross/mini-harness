@@ -1,0 +1,31 @@
+:root {
+  /* DeepSeek Official Clean Light Palette */
+  --dsh-bg-page: #ffffff;
+  --dsh-bg-sidebar: #f8f9fa;
+  --dsh-bg-card: #ffffff;
+  --dsh-bg-input: #ffffff;
+  --dsh-bg-hover: #f3f4f6;
+  --dsh-bg-active: #edf2f7;
+  --dsh-bg-code: #f8fafc;
+
+  --dsh-border-subtle: #f1f5f9;
+  --dsh-border-default: #e2e8f0;
+  --dsh-border-strong: #cbd5e1;
+
+  --dsh-text-primary: #0f172a;
+  --dsh-text-secondary: #475569;
+  --dsh-text-muted: #64748b;
+  --dsh-text-dim: #94a3b8;
+
+  --dsh-brand: #2563eb;
+  --dsh-brand-hover: #1d4ed8;
+  --dsh-brand-light: #eff6ff;
+  --dsh-brand-border: #bfdbfe;
+
+  --dsh-success: #16a34a;
+  --dsh-warning: #d97706;
+  --dsh-danger: #dc2626;
+
+  --dsh-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --dsh-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}

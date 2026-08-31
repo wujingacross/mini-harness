@@ -1,12 +1,13 @@
 {
   "name": "mini-harness",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A clean-room, educational reconstruction of DeepSeek Harness (deepseek-harness / dsh / DeepSeek Code) coding agent framework.",
   "type": "module",
   "scripts": {
     "demo:echo": "tsx src/demo/echo.ts",
     "demo:coding": "tsx src/demo/coding.ts",
     "demo:acp": "tsx src/demo/acp.ts",
+    "demo:web": "tsx src/demo/web.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
@@ -19,6 +20,7 @@
     "ai-agent",
     "agent-client-protocol",
     "acp",
+    "web-ui",
     "cordis",
     "microkernel",
     "event-sourcing",

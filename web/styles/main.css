@@ -1,0 +1,131 @@
+@import "./theme.css";
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--dsh-bg-page);
+  color: var(--dsh-text-primary);
+  font-family: var(--dsh-font-sans);
+  height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Minimal Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Trajectory Stream Rows */
+.trajectory-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--dsh-text-secondary);
+}
+
+.trajectory-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--dsh-text-muted);
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.trajectory-type {
+  font-weight: 500;
+  color: var(--dsh-text-secondary);
+}
+
+.trajectory-sep {
+  color: var(--dsh-text-dim);
+}
+
+.trajectory-content {
+  color: var(--dsh-text-muted);
+  word-break: break-word;
+}
+
+.trajectory-path {
+  color: var(--dsh-text-primary);
+  text-decoration: underline;
+  text-decoration-color: #cbd5e1;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.trajectory-path:hover {
+  color: var(--dsh-brand);
+  text-decoration-color: var(--dsh-brand);
+}
+
+/* Diff Styling */
+.diff-del {
+  background-color: #fee2e2;
+  color: #991b1b;
+  padding: 1px 4px;
+}
+.diff-add {
+  background-color: #dcfce7;
+  color: #166534;
+  padding: 1px 4px;
+}
+
+/* Message Markdown Content */
+.prose-assistant {
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--dsh-text-primary);
+}
+.prose-assistant p {
+  margin-bottom: 0.75em;
+}
+.prose-assistant code {
+  font-family: var(--dsh-font-mono);
+  font-size: 12.5px;
+  background-color: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #0f172a;
+}
+.prose-assistant pre {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-family: var(--dsh-font-mono);
+  font-size: 12.5px;
+  margin: 10px 0;
+}
+
+/* Floating Input Shadow */
+.floating-input-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
+}
+.floating-input-card:focus-within {
+  border-color: #93c5fd;
+  box-shadow: 0 4px 24px -2px rgba(37, 99, 235, 0.08), 0 0 0 1px #93c5fd;
+}

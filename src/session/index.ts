@@ -138,6 +138,10 @@ export class SessionStore extends Service {
   get(id: string): Session | undefined {
     return this.store.get(id)
   }
+
+  list(): string[] {
+    return Array.from(this.store.keys())
+  }
 }
 
 export default SessionStore
