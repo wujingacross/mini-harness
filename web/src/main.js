@@ -10,7 +10,6 @@ import { createInputArea } from './components/input-area.js';
 async function bootstrap() {
   const sessionTitleEl = document.getElementById('headerSessionTitle');
   const modelBadgeEl = document.getElementById('headerModelBadge');
-  const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
   const exportSessionBtn = document.getElementById('exportSessionBtn');
 
   const chatStream = createChatStream();
@@ -28,13 +27,6 @@ async function bootstrap() {
       await loadSessions();
     },
   });
-
-  // Sidebar Collapse/Expand Toggle
-  if (toggleSidebarBtn) {
-    toggleSidebarBtn.onclick = () => {
-      sidebar.toggleCollapse();
-    };
-  }
 
   // Export Session Log
   exportSessionBtn.onclick = async () => {
@@ -84,20 +76,23 @@ async function bootstrap() {
     },
   });
 
-  // 监听后端下发的 SSE 实时事件流
+  // 监听后端下发的 SSE 实时事件流 (精准匹配 StreamChunk 规范与 SessionEvent)
   connection.onEvent((event) => {
     if (event.type === 'turn/start') {
       state.setRunning(true);
     } else if (event.type === 'step/start') {
       inputArea.incrementStep();
+      chatStream.stepStart();
     } else if (event.type === 'assistant/chunk') {
       const chunk = event.data.chunk;
-      if (chunk.kind === 'reasoning') {
+      if (chunk.type === 'reasoning-delta' || chunk.kind === 'reasoning') {
         chatStream.appendThoughtChunk(chunk.text);
-      } else if (chunk.kind === 'text') {
+      } else if (chunk.type === 'text-delta' || chunk.kind === 'text') {
         chatStream.appendTextChunk(chunk.text);
-      } else if (chunk.kind === 'tool_call') {
-        chatStream.handleToolCall(chunk.id, chunk.name, chunk.arguments);
+      } else if (chunk.type === 'tool-call-delta') {
+        if (chunk.id && chunk.name) {
+          chatStream.handleToolCall(chunk.id, chunk.name, {});
+        }
       }
     } else if (event.type === 'tool/call') {
       chatStream.handleToolCall(event.data.callId || event.data.id, event.data.name, event.data.arguments);
