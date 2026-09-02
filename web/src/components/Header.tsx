@@ -2,11 +2,10 @@ import React from 'react'
 import { useSession } from '../context/SessionContext'
 
 export const Header: React.FC = () => {
-  const { currentSessionId, activeTab, setActiveTab, exportSessionLog } = useSession()
+  const { currentSessionId, sessions, activeTab, setActiveTab, exportSessionLog } = useSession()
 
-  const displayName = currentSessionId
-    ? currentSessionId.replace(/^ses_\d+_/, 'Session ')
-    : 'New Session'
+  const currentSession = sessions.find((s) => s.id === currentSessionId)
+  const displayName = currentSession?.title || (currentSessionId ? currentSessionId.replace(/^ses_\d+_/, 'Session ') : '新会话')
 
   return (
     <header className="h-12 border-b border-slate-200 bg-white px-5 flex items-center justify-between shrink-0 z-20 select-none">

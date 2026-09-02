@@ -227,13 +227,42 @@ export class WebServer extends Service {
       }
 
       const allIds = Array.from(new Set([...activeIds, ...persistedIds]))
-      const sessionList = allIds.map((id) => {
-        const ses = this.ctx.sessions.get(id)
-        return {
-          id,
-          eventsCount: ses?.events.length || 0,
-        }
-      })
+      const sessionList = await Promise.all(
+        allIds.map(async (id) => {
+          let ses = this.ctx.sessions.get(id)
+          if (!ses && persistence) {
+            const loaded = await persistence.load(id)
+            if (loaded) {
+              ses = this.ctx.sessions.create(id, loaded.events, loaded.header)
+            }
+          }
+
+          let title = ''
+          if (ses) {
+            const userEvt = ses.events.find((e) => e.type === 'user/message')
+            if (userEvt) {
+              const c = userEvt.data.content as any
+              if (typeof c === 'string') {
+                title = c
+              } else if (Array.isArray(c)) {
+                title = c[0]?.text || (typeof c[0] === 'string' ? c[0] : '')
+              } else if (c?.text) {
+                title = c.text
+              }
+            }
+          }
+
+          if (!title) {
+            title = id.startsWith('ses_') ? '新会话' : id
+          }
+
+          return {
+            id,
+            title: title.slice(0, 32),
+            eventsCount: ses?.events.length || 0,
+          }
+        })
+      )
 
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ sessions: sessionList }))

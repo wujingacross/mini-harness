@@ -122,7 +122,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse 
         <div className="pl-4 space-y-0.5">
           {sessions.map((ses) => {
             const isCurrent = ses.id === currentSessionId
-            const displayName = ses.id.replace(/^ses_\d+_/, 'Session ')
+            const displayName = ses.title || ses.id.replace(/^ses_\d+_/, 'Session ')
             return (
               <div
                 key={ses.id}

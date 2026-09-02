@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 
 export interface SessionHeader {
   id: string
+  title?: string
   eventsCount: number
 }
 

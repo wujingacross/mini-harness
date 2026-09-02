@@ -24,49 +24,79 @@ export const TrajectoryStream: React.FC = () => {
   const items = useMemo(() => {
     const list: TimelineItem[] = []
     const toolMap = new Map<string, ToolCallItem>()
-    let currentThinkText = ''
-    let currentAssistantText = ''
 
-    const flushThink = () => {
-      if (currentThinkText) {
-        list.push({ kind: 'think', id: `think_${list.length}`, content: currentThinkText })
-        currentThinkText = ''
+    // 1. Identify which turn/step already have finalized assistant/message
+    const finalizedSteps = new Set<string>()
+    for (const evt of events) {
+      if (evt.type === 'assistant/message') {
+        const key = `${evt.data.turn}_${evt.data.step}`
+        finalizedSteps.add(key)
       }
     }
 
-    const flushText = () => {
-      if (currentAssistantText) {
-        list.push({ kind: 'text', id: `text_${list.length}`, content: currentAssistantText })
-        currentAssistantText = ''
+    // Temporary streaming buffers for in-progress step
+    let streamingThink = ''
+    let streamingText = ''
+
+    const flushStreamingThink = () => {
+      if (streamingThink) {
+        list.push({ kind: 'think', id: `stream_think_${list.length}`, content: streamingThink })
+        streamingThink = ''
+      }
+    }
+
+    const flushStreamingText = () => {
+      if (streamingText) {
+        list.push({ kind: 'text', id: `stream_text_${list.length}`, content: streamingText })
+        streamingText = ''
       }
     }
 
     for (const evt of events) {
       if (evt.type === 'user/message') {
-        flushThink()
-        flushText()
-        const text = evt.data.content?.[0]?.text || ''
-        list.push({ kind: 'user', id: `user_${list.length}`, content: text })
+        flushStreamingThink()
+        flushStreamingText()
+
+        let userText = ''
+        if (typeof evt.data.content === 'string') {
+          userText = evt.data.content
+        } else if (Array.isArray(evt.data.content)) {
+          userText = evt.data.content.map((c: any) => (typeof c === 'string' ? c : c.text || '')).join('\n')
+        } else if (evt.data.content?.text) {
+          userText = evt.data.content.text
+        }
+
+        list.push({ kind: 'user', id: `user_${list.length}`, content: userText })
       } else if (evt.type === 'assistant/chunk') {
-        const chunk = evt.data.chunk
-        if (chunk.type === 'reasoning-delta' || chunk.kind === 'reasoning') {
-          currentThinkText += chunk.text
-        } else if (chunk.type === 'text-delta' || chunk.kind === 'text') {
-          flushThink()
-          currentAssistantText += chunk.text
+        const key = `${evt.data.turn}_${evt.data.step}`
+        // Only stream chunks for in-progress step that hasn't finalized
+        if (!finalizedSteps.has(key)) {
+          const chunk = evt.data.chunk
+          if (chunk.type === 'reasoning-delta' || chunk.kind === 'reasoning') {
+            streamingThink += chunk.text
+          } else if (chunk.type === 'text-delta' || chunk.kind === 'text') {
+            flushStreamingThink()
+            streamingText += chunk.text
+          }
         }
       } else if (evt.type === 'tool/call') {
-        flushThink()
-        flushText()
+        const key = `${evt.data.turn}_${evt.data.step}`
         const callId = evt.data.callId || evt.data.id || `tool_${list.length}`
-        const item: ToolCallItem = {
-          id: callId,
-          name: evt.data.name,
-          args: evt.data.arguments || {},
-          status: 'running',
+        if (!toolMap.has(callId)) {
+          const item: ToolCallItem = {
+            id: callId,
+            name: evt.data.name,
+            args: evt.data.arguments || {},
+            status: 'running',
+          }
+          toolMap.set(callId, item)
+
+          if (!finalizedSteps.has(key)) {
+            flushStreamingThink()
+            flushStreamingText()
+            list.push({ kind: 'tool', id: callId, tool: item })
+          }
         }
-        toolMap.set(callId, item)
-        list.push({ kind: 'tool', id: callId, tool: item })
       } else if (evt.type === 'tool/result') {
         const callId = evt.data.callId
         const item = toolMap.get(callId)
@@ -75,35 +105,34 @@ export const TrajectoryStream: React.FC = () => {
           item.result = evt.data.content
         }
       } else if (evt.type === 'assistant/message') {
-        // Materialized assistant message
-        flushThink()
-        flushText()
+        // Materialized finalized message: render once and cleanly
+        flushStreamingThink()
+        flushStreamingText()
+
         for (const block of evt.data.content || []) {
           if (block.type === 'reasoning') {
             list.push({ kind: 'think', id: `think_${list.length}`, content: block.text })
           } else if (block.type === 'text') {
             list.push({ kind: 'text', id: `text_${list.length}`, content: block.text })
           } else if (block.type === 'tool-call') {
-            if (!toolMap.has(block.id)) {
-              const item: ToolCallItem = {
+            let item = toolMap.get(block.id)
+            if (!item) {
+              item = {
                 id: block.id,
                 name: block.name,
                 args: block.arguments || {},
                 status: 'completed',
               }
               toolMap.set(block.id, item)
-              list.push({ kind: 'tool', id: block.id, tool: item })
             }
+            list.push({ kind: 'tool', id: block.id, tool: item })
           }
         }
-      } else if (evt.type === 'turn/end') {
-        flushThink()
-        flushText()
       }
     }
 
-    flushThink()
-    flushText()
+    flushStreamingThink()
+    flushStreamingText()
     return list
   }, [events])
 
@@ -112,20 +141,20 @@ export const TrajectoryStream: React.FC = () => {
   }, [items])
 
   return (
-    <div className="flex-1 overflow-y-auto px-16 py-6 space-y-3 max-w-4xl w-full mx-auto select-text">
+    <div className="flex-1 overflow-y-auto px-16 py-8 space-y-2 max-w-4xl w-full mx-auto select-text font-sans">
       {items.map((item) => {
         if (item.kind === 'user') {
           return (
             <div
               key={item.id}
-              className="trajectory-row pt-4 pb-2 border-b border-slate-100 font-semibold text-slate-900"
+              className="flex items-baseline gap-2 pt-6 pb-2.5 border-b border-slate-100 mb-2 font-semibold text-slate-900"
             >
-              <span className="trajectory-icon text-blue-600">
-                <i className="fa-solid fa-circle-user text-sm"></i>
+              <span className="text-blue-600 text-sm">
+                <i className="fa-solid fa-circle-user"></i>
               </span>
-              <span className="trajectory-type text-blue-600 font-bold">User</span>
-              <span className="trajectory-sep">·</span>
-              <span className="text-slate-900 font-normal leading-relaxed whitespace-pre-wrap">
+              <span className="text-blue-600 font-bold text-sm">User</span>
+              <span className="text-slate-300">·</span>
+              <span className="text-slate-900 font-normal text-sm whitespace-pre-wrap leading-relaxed">
                 {item.content}
               </span>
             </div>
@@ -134,13 +163,14 @@ export const TrajectoryStream: React.FC = () => {
 
         if (item.kind === 'think') {
           return (
-            <div key={item.id} className="trajectory-row trajectory-think-row text-xs text-slate-500">
-              <span className="trajectory-icon">
-                <i className="fa-solid fa-cube text-[11px] text-slate-400"></i>
-              </span>
-              <span className="trajectory-type text-slate-600">Think</span>
-              <span className="trajectory-sep">·</span>
-              <span className="trajectory-content whitespace-pre-wrap">{item.content}</span>
+            <div
+              key={item.id}
+              className="flex items-baseline gap-2 py-0.5 text-[13px] text-slate-500 font-normal leading-relaxed"
+            >
+              <span className="text-slate-400 shrink-0 text-xs">⬡</span>
+              <span className="text-slate-600 font-medium">Think</span>
+              <span className="text-slate-300">·</span>
+              <span className="text-slate-500 whitespace-pre-wrap leading-relaxed">{item.content}</span>
             </div>
           )
         }
@@ -178,28 +208,24 @@ export const TrajectoryStream: React.FC = () => {
           }
 
           return (
-            <div key={item.id} className="trajectory-row select-none py-0.5">
-              <span className="trajectory-icon">
-                <i className={`fa-solid ${icon} text-[11px]`}></i>
+            <div key={item.id} className="flex items-baseline gap-2 py-0.5 text-[13px] text-slate-700 leading-relaxed font-normal">
+              <span className="text-slate-400 shrink-0 text-xs">
+                <i className={`fa-solid ${icon}`}></i>
               </span>
-              <span className="trajectory-type">{label}</span>
-              <span className="trajectory-sep">·</span>
+              <span className="text-slate-800 font-medium">{label}</span>
+              <span className="text-slate-300">·</span>
               <span
-                className={`trajectory-content font-mono text-xs ${
-                  paramText.includes('/') ? 'trajectory-path' : ''
+                className={`font-mono text-xs text-slate-900 ${
+                  paramText.includes('/') ? 'hover:underline cursor-pointer' : ''
                 }`}
               >
                 {paramText || tool.name}
               </span>
               {tool.status === 'running' && (
-                <span className="status-indicator ml-auto text-[10px] text-slate-400 font-normal">
-                  运行中...
-                </span>
+                <span className="ml-auto text-[10px] text-slate-400 font-normal">运行中...</span>
               )}
               {tool.status === 'failed' && (
-                <span className="status-indicator ml-auto text-[10px] text-red-500 font-medium">
-                  失败
-                </span>
+                <span className="ml-auto text-[10px] text-red-500 font-medium">失败</span>
               )}
             </div>
           )
@@ -207,7 +233,7 @@ export const TrajectoryStream: React.FC = () => {
 
         if (item.kind === 'text' && item.content) {
           return (
-            <div key={item.id} className="py-2 my-1.5">
+            <div key={item.id} className="py-2.5 my-1 text-slate-900">
               <MarkdownView content={item.content} />
             </div>
           )
