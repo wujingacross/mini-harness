@@ -26,6 +26,8 @@ const MIME_TYPES: Record<string, string> = {
   '.css': 'text/css; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
   '.mjs': 'application/javascript; charset=utf-8',
+  '.ts': 'application/javascript; charset=utf-8',
+  '.tsx': 'application/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
@@ -43,7 +45,7 @@ export class WebServer extends Service {
   public port: number
   public host: string
   private workspaceDir: string
-  private webDistDir: string
+  private explicitDistDir?: string
   private defaultModel: string
   private defaultSystemPrompt?: string
   private activeAgents = new Map<string, Agent>()
@@ -53,14 +55,18 @@ export class WebServer extends Service {
     this.port = config.port !== undefined ? config.port : 3000
     this.host = config.host || '127.0.0.1'
     this.workspaceDir = config.workspaceDir || process.cwd()
-
-    const defaultDist = existsSync(join(process.cwd(), 'web/dist'))
-      ? join(process.cwd(), 'web/dist')
-      : join(process.cwd(), 'web')
-
-    this.webDistDir = config.webDistDir || defaultDist
+    this.explicitDistDir = config.webDistDir
     this.defaultModel = config.model || 'deepseek-chat'
     this.defaultSystemPrompt = config.systemPrompt
+  }
+
+  private getActiveDistDir(): string {
+    if (this.explicitDistDir) return this.explicitDistDir
+    const distPath = join(this.workspaceDir, 'web/dist')
+    if (existsSync(join(distPath, 'index.html'))) {
+      return distPath
+    }
+    return join(this.workspaceDir, 'web')
   }
 
   async start(): Promise<string> {
@@ -75,15 +81,26 @@ export class WebServer extends Service {
         })
       })
 
-      this.server.on('error', reject)
+      const tryListen = (port: number) => {
+        this.server?.listen(port, this.host, () => {
+          const addr = this.server?.address()
+          const actualPort = typeof addr === 'object' && addr ? addr.port : port
+          this.port = actualPort
+          const url = `http://${this.host}:${actualPort}`
+          resolve(url)
+        })
+      }
 
-      this.server.listen(this.port, this.host, () => {
-        const addr = this.server?.address()
-        const actualPort = typeof addr === 'object' && addr ? addr.port : this.port
-        this.port = actualPort
-        const url = `http://${this.host}:${actualPort}`
-        resolve(url)
+      this.server.on('error', (err: any) => {
+        if (err.code === 'EADDRINUSE' && this.port !== 0) {
+          this.port += 1
+          tryListen(this.port)
+          return
+        }
+        reject(err)
       })
+
+      tryListen(this.port)
     })
   }
 
@@ -158,10 +175,11 @@ export class WebServer extends Service {
   }
 
   private async serveStaticFile(pathname: string, res: http.ServerResponse): Promise<void> {
+    const activeDist = this.getActiveDistDir()
     let relPath = pathname === '/' ? 'index.html' : pathname.replace(/^\//, '')
     relPath = normalize(relPath).replace(/^(\.\.(\/|\\|$))+/, '')
 
-    let filePath = join(this.webDistDir, relPath)
+    let filePath = join(activeDist, relPath)
 
     try {
       let stat = await fs.stat(filePath)
@@ -182,7 +200,7 @@ export class WebServer extends Service {
       res.end(content)
     } catch {
       // SPA Fallback: 不匹配的静态路由回退到 index.html
-      const indexPath = join(this.webDistDir, 'index.html')
+      const indexPath = join(activeDist, 'index.html')
       try {
         const indexContent = await fs.readFile(indexPath)
         res.writeHead(200, {
@@ -192,7 +210,7 @@ export class WebServer extends Service {
         res.end(indexContent)
       } catch (err: any) {
         res.writeHead(404, { 'Content-Type': 'text/plain' })
-        res.end(`404 Not Found: Static dist not found at ${this.webDistDir}`)
+        res.end(`404 Not Found: Static dist not found at ${activeDist}`)
       }
     }
   }

@@ -12,6 +12,8 @@ import { createSearchTools } from '../tools/search.js'
 import { JsonlSessionPersistence } from '../session-persistence/jsonl.js'
 import AgentRegistry from '../agent/index.js'
 import AgentLoop from '../agent-loop/index.js'
+import { existsSync } from 'node:fs'
+import { execSync } from 'node:child_process'
 import WebServer from '../web/index.js'
 
 // 加载 .env
@@ -24,6 +26,12 @@ try {
 }
 
 async function main() {
+  const distIndex = join(process.cwd(), 'web/dist/index.html')
+  if (!existsSync(distIndex)) {
+    console.log('\x1b[33m[Build] Building React frontend bundle with Vite...\x1b[0m')
+    execSync('pnpm run build:web', { stdio: 'inherit' })
+  }
+
   const apiKey = process.env.DEEPSEEK_API_KEY
   if (!apiKey) {
     console.error('\x1b[31m[Error] DEEPSEEK_API_KEY is not set!\x1b[0m')
