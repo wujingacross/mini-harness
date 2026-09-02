@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useSession } from '../context/SessionContext'
 import { MarkdownView } from './MarkdownView'
 
@@ -17,8 +17,69 @@ interface TimelineItem {
   tool?: ToolCallItem
 }
 
+/**
+ * MessageActionToolbar: 对齐官方 ui-message-feedback (Red Box 4)
+ * 包含：复制 (Copy)、好评 (Like)、差评 (Dislike)、重试 / 分支 (Retry)
+ */
+const MessageActionToolbar: React.FC<{ content: string }> = ({ content }) => {
+  const [copied, setCopied] = useState(false)
+  const [liked, setLiked] = useState(false)
+  const [disliked, setDisliked] = useState(false)
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(content)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="inline-flex items-center gap-0.5 mt-2.5 px-1 py-0.5 rounded-lg border border-slate-200 bg-white text-slate-400 text-xs shadow-2xs select-none">
+      <button
+        onClick={handleCopy}
+        className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-100 hover:text-slate-700 transition cursor-pointer"
+        title={copied ? '已复制' : '复制回答'}
+      >
+        <i className={copied ? 'fa-solid fa-check text-green-600 text-[11px]' : 'fa-regular fa-copy text-[11px]'}></i>
+      </button>
+
+      <button
+        onClick={() => {
+          setLiked(!liked)
+          if (!liked) setDisliked(false)
+        }}
+        className={`w-6 h-6 rounded flex items-center justify-center hover:bg-slate-100 transition cursor-pointer ${
+          liked ? 'text-blue-600' : 'hover:text-slate-700'
+        }`}
+        title="好评"
+      >
+        <i className="fa-regular fa-thumbs-up text-[11px]"></i>
+      </button>
+
+      <button
+        onClick={() => {
+          setDisliked(!disliked)
+          if (!disliked) setLiked(false)
+        }}
+        className={`w-6 h-6 rounded flex items-center justify-center hover:bg-slate-100 transition cursor-pointer ${
+          disliked ? 'text-red-500' : 'hover:text-slate-700'
+        }`}
+        title="差评"
+      >
+        <i className="fa-regular fa-thumbs-down text-[11px]"></i>
+      </button>
+
+      <button
+        className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-100 hover:text-slate-700 transition cursor-pointer"
+        title="重试 / 分支"
+      >
+        <i className="fa-solid fa-arrow-rotate-right text-[10px]"></i>
+      </button>
+    </div>
+  )
+}
+
 export const TrajectoryStream: React.FC = () => {
-  const { events } = useSession()
+  const { events, activeTab } = useSession()
   const streamEndRef = useRef<HTMLDivElement | null>(null)
 
   const items = useMemo(() => {
@@ -34,7 +95,7 @@ export const TrajectoryStream: React.FC = () => {
       }
     }
 
-    // Temporary streaming buffers for in-progress step
+    // Streaming buffers for in-progress step
     let streamingThink = ''
     let streamingText = ''
 
@@ -69,7 +130,6 @@ export const TrajectoryStream: React.FC = () => {
         list.push({ kind: 'user', id: `user_${list.length}`, content: userText })
       } else if (evt.type === 'assistant/chunk') {
         const key = `${evt.data.turn}_${evt.data.step}`
-        // Only stream chunks for in-progress step that hasn't finalized
         if (!finalizedSteps.has(key)) {
           const chunk = evt.data.chunk
           if (chunk.type === 'reasoning-delta' || chunk.kind === 'reasoning') {
@@ -105,7 +165,6 @@ export const TrajectoryStream: React.FC = () => {
           item.result = evt.data.content
         }
       } else if (evt.type === 'assistant/message') {
-        // Materialized finalized message: render once and cleanly
         flushStreamingThink()
         flushStreamingText()
 
@@ -140,9 +199,16 @@ export const TrajectoryStream: React.FC = () => {
     streamEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [items])
 
+  const visibleItems = useMemo(() => {
+    if (activeTab === 'trajectory') {
+      return items.filter((it) => it.kind === 'think' || it.kind === 'tool')
+    }
+    return items
+  }, [items, activeTab])
+
   return (
     <div className="flex-1 overflow-y-auto px-16 py-8 space-y-2 max-w-4xl w-full mx-auto select-text font-sans">
-      {items.map((item) => {
+      {visibleItems.map((item) => {
         if (item.kind === 'user') {
           return (
             <div
@@ -235,6 +301,8 @@ export const TrajectoryStream: React.FC = () => {
           return (
             <div key={item.id} className="py-2.5 my-1 text-slate-900">
               <MarkdownView content={item.content} />
+              {/* Red Box 4: Message Actions Toolbar */}
+              <MessageActionToolbar content={item.content} />
             </div>
           )
         }
