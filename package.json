@@ -7,7 +7,10 @@
     "demo:echo": "tsx src/demo/echo.ts",
     "demo:coding": "tsx src/demo/coding.ts",
     "demo:acp": "tsx src/demo/acp.ts",
-    "demo:web": "tsx src/demo/web.ts",
+    "demo:web": "pnpm run build:web && tsx src/demo/web.ts",
+    "build:web": "vite build",
+    "dev:web": "vite",
+    "pretest": "vite build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
@@ -35,12 +38,18 @@
     "url": "https://github.com/wujingacross/mini-harness.git"
   },
   "dependencies": {
-    "cordis": "4.0.0-rc.8"
+    "cordis": "4.0.0-rc.8",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^6.1.1",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2",
+    "vite": "^8.2.2",
     "vitest": "^4.1.10"
   }
 }

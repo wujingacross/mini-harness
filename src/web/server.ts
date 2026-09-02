@@ -1,5 +1,5 @@
 import http from 'node:http'
-import { promises as fs } from 'node:fs'
+import { existsSync, promises as fs } from 'node:fs'
 import { extname, isAbsolute, join, normalize, relative } from 'node:path'
 import { Context, Service } from 'cordis'
 import type { Agent } from '../agent/index.js'
@@ -53,7 +53,12 @@ export class WebServer extends Service {
     this.port = config.port !== undefined ? config.port : 3000
     this.host = config.host || '127.0.0.1'
     this.workspaceDir = config.workspaceDir || process.cwd()
-    this.webDistDir = config.webDistDir || join(process.cwd(), 'web')
+
+    const defaultDist = existsSync(join(process.cwd(), 'web/dist'))
+      ? join(process.cwd(), 'web/dist')
+      : join(process.cwd(), 'web')
+
+    this.webDistDir = config.webDistDir || defaultDist
     this.defaultModel = config.model || 'deepseek-chat'
     this.defaultSystemPrompt = config.systemPrompt
   }
