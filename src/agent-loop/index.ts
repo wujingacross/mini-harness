@@ -5,6 +5,7 @@ import type { ContentBlock, TextBlock, ToolCallBlock } from '../types/blocks.js'
 import { BlockAssembler } from '../types/stream.js'
 import { renderPrompt } from '../system-prompt/index.js'
 import type { SessionPersistence } from '../session-persistence/index.js'
+import type { CompactionEngine } from '../compaction/index.js'
 
 declare module 'cordis' {
   interface Context {
@@ -22,6 +23,10 @@ export class ReactLoopAgent implements Agent {
   private idleWaiters: (() => void)[] = []
   private turnCounter = 0
   private abortController?: AbortController
+
+  private get compaction(): CompactionEngine | undefined {
+    return this.ctx.get('compaction') as CompactionEngine | undefined
+  }
 
   constructor(
     private ctx: Context,
@@ -45,9 +50,71 @@ export class ReactLoopAgent implements Agent {
     const blocks: ContentBlock[] =
       typeof content === 'string' ? [{ type: 'text', text: content }] : content
 
+    // 拦截 /compact 手动压缩命令
+    if (blocks.length === 1 && blocks[0].type === 'text' && blocks[0].text.trim() === '/compact') {
+      void this.executeManualCompaction()
+      return
+    }
+
     this.inbox.push(blocks)
     if (this.status === 'idle') {
       void this.drainInbox()
+    }
+  }
+
+  /**
+   * 手动触发会话压缩 (/compact)
+   */
+  async executeManualCompaction(): Promise<void> {
+    if (this.status === 'running') {
+      this.session.append('context/message', {
+        content: [{ type: 'text', text: '当前智能体正在执行任务，请等待本轮任务完成后再执行 /compact。' }],
+        source: 'system',
+      })
+      return
+    }
+
+    this.status = 'running'
+    this.ctx.emit('agent/status', this, 'running')
+    try {
+      if (this.compaction) {
+        const res = await this.compaction.compactNow(this)
+        if (res) {
+          this.session.append('assistant/message', {
+            turn: this.turnCounter,
+            step: 1,
+            content: [
+              {
+                type: 'text',
+                text: `✅ **会话历史已成功压缩** (Compaction ID: \`${res.compactionId}\`)\n- 被折叠历史事件：${res.shadowedSeqs.length} 条 (Seq ${res.shadowedRange.start} ~ ${res.shadowedRange.end})\n- 估算释放 Token：约 ${res.shadowedTokenCount} tokens\n- 关键上下文已转录为结构化摘要，后续轮次将无缝继承该摘要。`,
+              },
+            ],
+          })
+        } else {
+          this.session.append('assistant/message', {
+            turn: this.turnCounter,
+            step: 1,
+            content: [{ type: 'text', text: '当前会话历史较短或处于保留区间内，无需进行压缩。' }],
+          })
+        }
+      } else {
+        this.session.append('assistant/message', {
+          turn: this.turnCounter,
+          step: 1,
+          content: [{ type: 'text', text: '系统未装载压缩插件 (CompactionEngine)。' }],
+        })
+      }
+    } catch (err: any) {
+      this.session.append('assistant/message', {
+        turn: this.turnCounter,
+        step: 1,
+        content: [{ type: 'text', text: `❌ 压缩执行失败: ${err?.message || String(err)}` }],
+      })
+    } finally {
+      this.status = 'idle'
+      this.ctx.emit('agent/status', this, 'idle')
+      await this.ctx.parallel('session/flush', this.session)
+      this.notifyIdle()
     }
   }
 
@@ -149,29 +216,57 @@ export class ReactLoopAgent implements Agent {
       this.session.append('step/start', { turn, step })
       this.ctx.emit('agent/step-start', this, turn, step)
 
+      // Pre-step: 自动压力压缩探测 (Compaction Pressure Check)
+      if (this.compaction && this.compaction.config.auto && !signal.aborted) {
+        try {
+          await this.compaction.compactIfNeeded(this, 'pressure', signal)
+        } catch (err: any) {
+          this.ctx.logger?.warn?.(`[Compaction] 步进自动压缩异常: ${err?.message || err}`)
+        }
+      }
+
       // 1. 装配提示词
       const assembly = await this.ctx.systemPrompt.assemble(this.session)
       const systemText = [renderPrompt(assembly), this.options.systemPrompt].filter(Boolean).join('\n\n')
 
-      // 2. 从事件流派生当前消息历史 (deriveMessages 纯函数投影，自动包含 steering)
+      // 2. 从事件流派生当前消息历史 (deriveMessages 纯函数投影，自动包含 steering 并过滤已压缩历史)
       const messages = this.session.deriveMessages()
 
       // 3. 调用大模型流式生成
       const assembler = new BlockAssembler()
       const model = this.options.model ?? 'default'
 
-      const stream = this.ctx.llm.stream({
-        model,
-        systemPrompt: systemText,
-        messages,
-        tools: assembly.tools,
-        signal,
-      })
+      try {
+        const stream = this.ctx.llm.stream({
+          model,
+          systemPrompt: systemText,
+          messages,
+          tools: assembly.tools,
+          signal,
+        })
 
-      for await (const chunk of stream) {
-        this.session.append('assistant/chunk', { turn, step, chunk })
-        this.ctx.emit('agent/chunk', this, chunk)
-        assembler.push(chunk)
+        for await (const chunk of stream) {
+          this.session.append('assistant/chunk', { turn, step, chunk })
+          this.ctx.emit('agent/chunk', this, chunk)
+          assembler.push(chunk)
+        }
+      } catch (err: any) {
+        const msg = String(err?.message || err)
+        if (
+          (msg.includes('context_length_exceeded') ||
+            msg.includes('maximum context length') ||
+            msg.includes('too long') ||
+            msg.includes('tokens exceeds')) &&
+          this.compaction &&
+          !signal.aborted
+        ) {
+          const res = await this.compaction.compactIfNeeded(this, 'context-overflow', signal)
+          if (res) {
+            step--
+            continue
+          }
+        }
+        throw err
       }
 
       const assistantBlocks = assembler.blocks()

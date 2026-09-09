@@ -9,6 +9,8 @@ export interface SessionHeader {
 
 export interface SessionEvent {
   type: string
+  seq?: number
+  time?: number
   data: any
 }
 

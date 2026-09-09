@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/wujingacross/mini-harness"><img src="https://img.shields.io/badge/GitHub-mini--harness-blue?logo=github" alt="GitHub"></a>
-  <a href="https://github.com/wujingacross/mini-harness/releases"><img src="https://img.shields.io/badge/Release-v1.1.0-green" alt="Release"></a>
+  <a href="https://github.com/wujingacross/mini-harness/releases"><img src="https://img.shields.io/badge/Release-v1.3.0-green" alt="Release"></a>
   <a href="https://github.com/wujingacross/mini-harness/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow" alt="License"></a>
   <a href="https://api.deepseek.com"><img src="https://img.shields.io/badge/LLM-DeepSeek--V3%20%7C%20DeepSeek--R1-4D6BFE" alt="DeepSeek"></a>
   <a href="https://zed.dev"><img src="https://img.shields.io/badge/Protocol-ACP%20(Zed%20Editor)-orange" alt="ACP"></a>
@@ -28,6 +28,7 @@ Mini Harness 将官方 Monorepo 中庞杂的 `@deepseek-ai/dsh-*` 多包体系�
 | `@deepseek-ai/dsh-agent-loop` | [`src/agent-loop/`](src/agent-loop/) | ReAct Loop 核心状态机（Turn ➔ Step ➔ Tool 驱动循环） |
 | `@deepseek-ai/dsh-session` | [`src/session/`](src/session/) | 事件溯源会话系统、`deriveMessages` 投影与崩溃恢复 |
 | `@deepseek-ai/dsh-session-persistence` | [`src/session-persistence/`](src/session-persistence/) | Write-Behind 缓冲池与 JSONL / SQLite 双持久化后端 |
+| `@deepseek-ai/dsh-compaction` | [`src/compaction/`](src/compaction/) | 上下文压缩能力 Seam、Tool 配对保护、三段式事务锁与 `/compact` 指令 |
 | `@deepseek-ai/dsh-tool-fs` / `tool-str-replace-editor` | [`src/tools/file.ts`](src/tools/file.ts) | `view_file` 切片查看、`replace_file_content` 精确局部替换、`write_to_file` |
 | `@deepseek-ai/dsh-tool-fs-search` | [`src/tools/search.ts`](src/tools/search.ts) | `find_by_name` Glob 文件查找、`grep_search` 正则代码检索 |
 | `@deepseek-ai/dsh-acp` | [`src/acp/`](src/acp/) | JSON-RPC 2.0 双工网关，连接 **Zed** 等现代 IDE 编辑器 |
@@ -66,6 +67,16 @@ Mini Harness 将官方 Monorepo 中庞杂的 `@deepseek-ai/dsh-*` 多包体系�
    - 中途干预与航向纠偏（`Mid-turn Steering`）：允许用户在执行中途注入 `<steering>` 指令动态修正任务方向；
    - 优雅级联取消（`Graceful Cancellation`）：进程组级联清理与状态机安全复位。
 
+7. **上下文自动压缩与 Token 管理（Context Compaction & Token Management）**：
+   - 三段式原子事务日志锁（`compaction/start`、`compaction/summary`、`compaction/end`），杜绝并发压缩冲突；
+   - Tool 成对边界保护算法（`balanceToolPairingRange`），防止截断未闭合的 tool-call / tool-result；
+   - 单向日志零破坏（Append-only），结合纯函数消息投影层 `deriveMessages()` 动态应用 `shadowedSeqs` 遮蔽历史并无缝置换结构化摘要；
+   - 三重触发机制：每步前置 Token 压力自检、运行期超窗（Context Overflow）异常容灾自愈与随时可触发的用户 `/compact` 交互指令。
+
+8. **现代化 React 19 Web 控制台（Web GUI Console）**：
+   - 轨迹流事件级实时渲染、工具执行卡片折叠/展开、Token 实时遥测底栏；
+   - 动态无感模型热切换（DeepSeek-V3 / DeepSeek-R1 / Mock LLM）与按需压缩操作。
+
 ---
 
 ## 📂 项目结构概览
@@ -74,43 +85,53 @@ Mini Harness 将官方 Monorepo 中庞杂的 `@deepseek-ai/dsh-*` 多包体系�
 mini-harness/
 ├── src/
 │   ├── types/               # 核心类型词表 (ContentBlocks, StreamChunks, SessionEvents, SessionHeader)
-│   ├── session/             # 事件溯源会话存储与消息派生 (deriveMessages 投影 + 崩溃修复 repair)
+│   ├── session/             # 事件溯源会话存储与消息派生 (deriveMessages 投影 + 崩溃修复 + 压缩遮蔽)
 │   ├── session-persistence/ # 工业级会话持久化 Seam 架构 (Write-Behind 缓冲池 + 检查点)
+│   ├── compaction/          # 【新增】上下文压缩 Seam 架构 (Engine, Tool Pairing 保护, Summarizer 摘要)
 │   ├── acp/                 # 现代化 IDE 接入网关 (Agent Client Protocol - ACP)
 │   ├── invariants/          # 运行时不变量守卫 (序号连续性断言 + Deep Freeze 深度冻结)
 │   ├── system-prompt/       # 提示词按优先级分段装配与 Tool Schema 注册
 │   ├── tools/               # 工具注册表与 tools/execute Waterfall 拦截流水线
 │   │   ├── bash.ts          # 面向大模型的标准 bash 工具 (进程组安全)
-│   │   ├── file.ts          # 【新增】view_file / replace_file_content / write_to_file
-│   │   └── search.ts        # 【新增】find_by_name / grep_search
+│   │   ├── file.ts          # view_file / replace_file_content / write_to_file
+│   │   └── search.ts        # find_by_name / grep_search
 │   ├── bash/                # Bash 执行能力 Seam 架构 (Interface + Local 进程组实现)
 │   ├── llm/                 # 统一模型服务抽象层 (Mock 适配器 + 真实 DeepSeek SSE 适配器)
 │   ├── agent/               # Agent 接口规范、注册表与全局生命周期事件 (含 steer / cancel)
-│   ├── agent-loop/          # ReAct Loop 核心状态机 (Turn -> Step -> Tool 调度 + resumeAgent 恢复)
+│   ├── agent-loop/          # ReAct Loop 核心状态机 (Turn -> Step -> Tool 调度 + resumeAgent + 压缩联动)
+│   ├── web/                 # Web 控制台后端 (RESTful API + SSE 轨迹流实时长连接)
 │   ├── ui/                  # 终端 Stdio 交互界面 (打字机流式输出与彩色卡片)
 │   └── demo/
 │       ├── echo.ts          # Milestone 1: 最简 Echo Agent Demo
 │       ├── coding.ts        # Milestone 2, 3 & 6: 具备持久化与全套读写工具的终端 Coding Agent
-│       └── acp.ts           # Milestone 4 & 6: 面向 Zed / IDE 的全功能 ACP Server 服务
-├── docs/                    # 分阶段演进与架构设计过程文档 (全套 6 篇教程)
+│       ├── acp.ts           # Milestone 4 & 6: 面向 Zed / IDE 的全功能 ACP Server 服务
+│       └── web.ts           # Milestone 7 & 8: 生产级 React 19 Web 控制台服务
+├── web/                     # React 19 + Vite 前端 SPA 控制台
+│   ├── src/components/      # TrajectoryStream 轨迹流, 侧边栏, 模型切换器, 工具卡片
+│   └── src/context/         # SessionContext 状态机与 SSE 实时同步管道
+├── docs/                    # 分阶段演进与架构设计过程文档 (全套 8 篇教程)
 │   ├── 01-milestone1-echo-agent.md
 │   ├── 02-milestone2-coding-agent.md
 │   ├── 03-milestone3-session-persistence.md
 │   ├── 04-milestone4-acp-ide-integration.md
 │   ├── 05-milestone5-resilience-and-hardening.md
-│   └── 06-milestone6-code-editing-and-search-tools.md
-├── tests/                   # 自动化测试套件 (11 个测试套件，30 个单测全部绿灯通过)
+│   ├── 06-milestone6-code-editing-and-search-tools.md
+│   ├── 07-milestone7-web-ui-interaction.md
+│   └── 08-milestone8-compaction-guide.md
+├── tests/                   # 自动化测试套件 (13 个测试套件，43 个单测全部绿灯通过)
 │   ├── echo.spec.ts         # ReAct 循环状态机测试
 │   ├── bash.spec.ts         # Bash 执行器与安全特性测试
-│   ├── file-tools.spec.ts   # 【新增】文件切片读写与局部精准替换测试
-│   ├── search-tools.spec.ts # 【新增】Glob 文件定位与正则代码检索测试
+│   ├── file-tools.spec.ts   # 文件切片读写与局部精准替换测试
+│   ├── search-tools.spec.ts # Glob 文件定位与正则代码检索测试
 │   ├── deepseek-adapter.spec.ts # DeepSeek 协议解析测试
 │   ├── session-persistence.spec.ts # JSONL / SQLite 双后端契约测试
 │   ├── resume.spec.ts       # 跨进程持久化与无缝断点续聊测试
 │   ├── acp.spec.ts          # ACP 协议网关与 IDE 交互测试
 │   ├── invariants.spec.ts   # 运行时不变量守卫与不可变冻结测试
 │   ├── steering.spec.ts     # Mid-turn Steering 动态纠偏测试
-│   └── cancellation.spec.ts # 优雅取消与级联清理测试
+│   ├── cancellation.spec.ts # 优雅取消与级联清理测试
+│   ├── web-server.spec.ts   # Web API 与 SSE 轨迹端点契约测试
+│   └── compaction.spec.ts   # 【新增】上下文压缩 Seam、Tool 配对保护与 /compact 指令测试
 ├── package.json
 └── tsconfig.json
 ```
@@ -155,6 +176,12 @@ pnpm run demo:coding
 }
 ```
 
+#### 方式 D：启动现代化 Web 控制台 (浏览器)
+```bash
+pnpm run demo:web
+# 浏览器访问 http://localhost:3000
+```
+
 ---
 
 ## 🗺️ 阶段路线图 (Roadmap)
@@ -166,7 +193,7 @@ pnpm run demo:coding
 - [x] **Milestone 5**: 系统韧性与高级控制（Invariants 不变量契约校验、中途打断 Steering、优雅取消 Cancellation）
 - [x] **Milestone 6 (v1.1.0)**: 专业代码编辑与检索工具链（`view_file` 切片、`replace_file_content` 精准替换、`find_by_name`、`grep_search`）
 - [x] **Milestone 7 (v1.2.0)**: 100% 对齐官方的 React 19 Web 控制台（轨迹流渲染、工具卡片折叠展开、实时遥测底栏、动态模型切换、一体化侧边栏）
-- [ ] **Milestone 8**: 上下文自动压缩与截断管理（`@deepseek-ai/dsh-compaction`）
+- [x] **Milestone 8 (v1.3.0)**: 上下文自动压缩与截断管理（三段式原子事务锁、Tool 配对保护、无损日志投影遮蔽、`/compact` 交互指令与 Web 视图可视化）
 - [ ] **Milestone 9**: 任务规划与结构化待办管理（`@deepseek-ai/dsh-plan` / `dsh-todo`）
 - [ ] **Milestone 10**: 人机协同与敏感操作干预授权（`@deepseek-ai/dsh-interaction`）
 - [ ] **Milestone 11**: 动态技能系统与渐进式扩展加载（`@deepseek-ai/dsh-skill`）
@@ -184,6 +211,7 @@ pnpm run demo:coding
 * 📖 [Milestone 5 系统韧性、Invariants 不变量与高级控制指南](docs/05-milestone5-resilience-and-hardening.md)
 * 📖 [Milestone 6 专业代码读写与检索工具链指南](docs/06-milestone6-code-editing-and-search-tools.md)
 * 📖 [Milestone 7 React 19 Web 控制台与轨迹流实战指南](docs/07-milestone7-web-ui-interaction.md)
+* 📖 [Milestone 8 上下文自动压缩与截断管理指南](docs/08-milestone8-compaction-guide.md)
 * 🧭 [Milestones 8 ~ 12 核心架构演进路线图](docs/08-future-milestones-roadmap.md)
 
 ---

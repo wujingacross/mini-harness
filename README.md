@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/wujingacross/mini-harness"><img src="https://img.shields.io/badge/GitHub-mini--harness-blue?logo=github" alt="GitHub"></a>
-  <a href="https://github.com/wujingacross/mini-harness/releases"><img src="https://img.shields.io/badge/Release-v1.1.0-green" alt="Release"></a>
+  <a href="https://github.com/wujingacross/mini-harness/releases"><img src="https://img.shields.io/badge/Release-v1.3.0-green" alt="Release"></a>
   <a href="https://github.com/wujingacross/mini-harness/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow" alt="License"></a>
   <a href="https://api.deepseek.com"><img src="https://img.shields.io/badge/LLM-DeepSeek--V3%20%7C%20DeepSeek--R1-4D6BFE" alt="DeepSeek"></a>
   <a href="https://zed.dev"><img src="https://img.shields.io/badge/Protocol-ACP%20(Zed%20Editor)-orange" alt="ACP"></a>
@@ -26,6 +26,7 @@ Mini Harness maps the multi-package complexity of official `@deepseek-ai/dsh-*` 
 | `@deepseek-ai/dsh-agent-loop` | [`src/agent-loop/`](src/agent-loop/) | ReAct Loop state machine (Turn ➔ Step ➔ Tool execution) |
 | `@deepseek-ai/dsh-session` | [`src/session/`](src/session/) | Event-sourced session store, `deriveMessages` projection & repair |
 | `@deepseek-ai/dsh-session-persistence` | [`src/session-persistence/`](src/session-persistence/) | Write-Behind buffer with JSONL / SQLite backends |
+| `@deepseek-ai/dsh-compaction` | [`src/compaction/`](src/compaction/) | Context compaction seam, tool-pairing balance, transaction locks & `/compact` command |
 | `@deepseek-ai/dsh-tool-fs` / `tool-str-replace-editor` | [`src/tools/file.ts`](src/tools/file.ts) | `view_file` line slicing, `replace_file_content` surgical editing, `write_to_file` |
 | `@deepseek-ai/dsh-tool-fs-search` | [`src/tools/search.ts`](src/tools/search.ts) | `find_by_name` glob search, `grep_search` regex code search |
 | `@deepseek-ai/dsh-acp` | [`src/acp/`](src/acp/) | JSON-RPC 2.0 stdio gateway connecting **Zed** & ACP editors |
@@ -63,6 +64,16 @@ Mini Harness maps the multi-package complexity of official `@deepseek-ai/dsh-*` 
    - Mid-turn Steering (`<steering>`) for dynamic real-time human intervention.
    - Cascading process group cancellation.
 
+7. **Context Compaction & Token Management**:
+   - 3-phase atomic transaction locks (`compaction/start`, `compaction/summary`, `compaction/end`) to guarantee deterministic concurrency control.
+   - Tool pairing boundary balancing (`balanceToolPairingRange`) preventing orphaned tool calls or broken execution pairs.
+   - Append-only event preservation with non-destructive `shadowedSeqs` masking during dynamic message projection (`deriveMessages()`).
+   - Triple trigger modes: pre-step token pressure threshold, runtime context overflow emergency recovery, and manual `/compact` user command.
+
+8. **Modern React 19 Web Console**:
+   - High-density trajectory stream with Markdown rendering, collapsible tool inspection cards, and token cost telemetry.
+   - Interactive model switching (DeepSeek-V3 / DeepSeek-R1 / Mock LLM) and manual compaction actions.
+
 ---
 
 ## 📂 Project Structure
@@ -71,43 +82,53 @@ Mini Harness maps the multi-package complexity of official `@deepseek-ai/dsh-*` 
 mini-harness/
 ├── src/
 │   ├── types/               # Core vocabulary (ContentBlocks, StreamChunks, SessionEvents, SessionHeader)
-│   ├── session/             # Event-sourced session store & message projection (+ repair)
+│   ├── session/             # Event-sourced session store & message projection (+ repair & compaction masking)
 │   ├── session-persistence/ # Session Persistence Seam (Write-Behind buffer + Checkpoints)
+│   ├── compaction/          # 【New】Context Compaction Seam (Engine, Tool Pairing Balance, Summarizer)
 │   ├── acp/                 # Agent Client Protocol (ACP) IDE Bridge
 │   ├── invariants/          # Runtime invariants guard & Deep Freeze immutability
 │   ├── system-prompt/       # Ordered section prompt assembly & tool schema providers
 │   ├── tools/               # Tool registry & tools/execute waterfall pipeline
 │   │   ├── bash.ts          # Model-facing bash tool definition
-│   │   ├── file.ts          # 【New】view_file, replace_file_content, write_to_file
-│   │   └── search.ts        # 【New】find_by_name, grep_search
+│   │   ├── file.ts          # view_file, replace_file_content, write_to_file
+│   │   └── search.ts        # find_by_name, grep_search
 │   ├── bash/                # Bash Capability Seam (Interface + Local process group impl)
 │   ├── llm/                 # Model adapters (Mock LLM + Real DeepSeek SSE adapter)
 │   ├── agent/               # Agent registry & global lifecycle events (+ steer / cancel)
-│   ├── agent-loop/          # ReAct Loop state machine (+ resumeAgent support)
+│   ├── agent-loop/          # ReAct Loop state machine (+ resumeAgent & compaction triggers)
+│   ├── web/                 # Web server (REST API + SSE Trajectory & Session streaming)
 │   ├── ui/                  # Interactive stdio CLI with ANSI streaming rendering
 │   └── demo/
 │       ├── echo.ts          # Milestone 1: Echo Agent Demo
 │       ├── coding.ts        # Milestone 2, 3 & 6: Real Coding Agent with Persistence, File & Search Tools
-│       └── acp.ts           # Milestone 4 & 6: Production ACP Server for Zed / IDE with File & Search Tools
-├── docs/                    # Architecture & implementation tutorials (Milestones 1-6)
+│       ├── acp.ts           # Milestone 4 & 6: Production ACP Server for Zed / IDE with File & Search Tools
+│       └── web.ts           # Milestone 7 & 8: Full-stack Web Console Server
+├── web/                     # React 19 + Vite Frontend SPA Console
+│   ├── src/components/      # TrajectoryStream, SessionSidebar, ModelSelector, Collapsible Tool Cards
+│   └── src/context/         # SessionContext & SSE Real-time Subscription
+├── docs/                    # Architecture & implementation tutorials (Milestones 1-8)
 │   ├── 01-milestone1-echo-agent.md
 │   ├── 02-milestone2-coding-agent.md
 │   ├── 03-milestone3-session-persistence.md
 │   ├── 04-milestone4-acp-ide-integration.md
 │   ├── 05-milestone5-resilience-and-hardening.md
-│   └── 06-milestone6-code-editing-and-search-tools.md
-├── tests/                   # Automated test suites (30 tests passing)
+│   ├── 06-milestone6-code-editing-and-search-tools.md
+│   ├── 07-milestone7-web-ui-interaction.md
+│   └── 08-milestone8-compaction-guide.md
+├── tests/                   # Automated test suites (13 test suites, 43 tests passing)
 │   ├── echo.spec.ts
 │   ├── bash.spec.ts
-│   ├── file-tools.spec.ts   # 【New】File line slicing & surgical replacement tests
-│   ├── search-tools.spec.ts # 【New】Glob & regex code search tests
+│   ├── file-tools.spec.ts
+│   ├── search-tools.spec.ts
 │   ├── deepseek-adapter.spec.ts
 │   ├── session-persistence.spec.ts
 │   ├── resume.spec.ts
 │   ├── acp.spec.ts
 │   ├── invariants.spec.ts
 │   ├── steering.spec.ts
-│   └── cancellation.spec.ts
+│   ├── cancellation.spec.ts
+│   ├── web-server.spec.ts
+│   └── compaction.spec.ts   # 【New】Compaction seam, tool-pairing balance & /compact command tests
 ├── package.json
 └── tsconfig.json
 ```
@@ -147,6 +168,12 @@ Add to Zed's `settings.json`:
 }
 ```
 
+#### Option C: Web GUI Console (Browser)
+```bash
+pnpm run demo:web
+# Open http://localhost:3000
+```
+
 ---
 
 ## 🗺️ Roadmap & Milestones
@@ -158,7 +185,7 @@ Add to Zed's `settings.json`:
 - [x] **Milestone 5**: Hardening (Invariants contract verification, Cancellation, Mid-turn Steering)
 - [x] **Milestone 6 (v1.1.0)**: Dedicated Code Editing & Discovery Tools (`view_file`, `replace_file_content`, `find_by_name`, `grep_search`)
 - [x] **Milestone 7 (v1.2.0)**: Modern React 19 Web Console (Trajectory Stream, Collapsible Tool Inspection, Real-time Telemetry, Dynamic Model Switch, Full-height Sidebar)
-- [ ] **Milestone 8**: Context Compaction & Token Management (`@deepseek-ai/dsh-compaction`)
+- [x] **Milestone 8 (v1.3.0)**: Context Compaction & Token Management (Token pressure check, atomic 3-phase compaction lock, tool pairing balance, `/compact` manual trigger & Web visual summary)
 - [ ] **Milestone 9**: Plan Mode & Structured Todo Tracking (`@deepseek-ai/dsh-plan`, `@deepseek-ai/dsh-todo`)
 - [ ] **Milestone 10**: Human-in-the-Loop Interaction & Sensitive Tool Approval (`@deepseek-ai/dsh-interaction`)
 - [ ] **Milestone 11**: Dynamic Skill System & Progressive Loading (`@deepseek-ai/dsh-skill`)
@@ -175,6 +202,7 @@ Add to Zed's `settings.json`:
 * 📖 [Milestone 5 System Resilience & Hardening Guide](docs/05-milestone5-resilience-and-hardening.md)
 * 📖 [Milestone 6 Code Editing & Search Toolchain Guide](docs/06-milestone6-code-editing-and-search-tools.md)
 * 📖 [Milestone 7 React 19 Web Console & Trajectory Stream Guide](docs/07-milestone7-web-ui-interaction.md)
+* 📖 [Milestone 8 Context Compaction & Token Management Guide](docs/08-milestone8-compaction-guide.md)
 * 🧭 [Milestones 8 ~ 12 Future Architectural Roadmap](docs/08-future-milestones-roadmap.md)
 
 ---

@@ -1,6 +1,6 @@
 {
   "name": "mini-harness",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "A clean-room, educational reconstruction of DeepSeek Harness (deepseek-harness / dsh / DeepSeek Code) coding agent framework.",
   "type": "module",
   "scripts": {

@@ -45,6 +45,19 @@ export interface SessionEventMap {
 
   // 高级干预：用户中途插话纠偏
   'steering/message': { turn: number; content: ContentBlock[]; source?: string }
+
+  // 上下文压缩能力家族 (Compaction)
+  'compaction/start': { compactionId: string; turn: number | null }
+  'compaction/summary': {
+    compactionId: string
+    summary: ContentBlock[]
+    shadowedRange: { start: number; end: number }
+    shadowedSeqs: number[]
+    shadowedTokenCount: number
+    provider?: string
+    model?: string
+  }
+  'compaction/end': { compactionId: string; turn: number | null; error?: string }
 }
 
 export type SessionEventType = keyof SessionEventMap

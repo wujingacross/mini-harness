@@ -79,7 +79,42 @@ export class Session {
 
   deriveMessages(): Message[] {
     const messages: Message[] = []
+
+    // 收集所有被压缩操作遮蔽的历史事件序号 (seq) 与起始替换位置映射
+    const shadowedSeqs = new Set<number>()
+    const summaryAtStartSeq = new Map<number, ContentBlock[]>()
+
     for (const event of this.log) {
+      if (event.type === 'compaction/summary') {
+        const data = event.data as SessionEventMap['compaction/summary']
+        if (Array.isArray(data.shadowedSeqs)) {
+          for (const s of data.shadowedSeqs) {
+            shadowedSeqs.add(s)
+          }
+        }
+        if (data.shadowedRange && data.summary) {
+          summaryAtStartSeq.set(data.shadowedRange.start, data.summary)
+        }
+      }
+    }
+
+    for (const event of this.log) {
+      // 1. 若该序号是压缩区间的起始位置，在此处前置注入压缩摘要！
+      if (summaryAtStartSeq.has(event.seq)) {
+        const summary = summaryAtStartSeq.get(event.seq)!
+        if (summary.length > 0) {
+          messages.push({
+            role: 'user',
+            content: renderTagged('context', structuredClone(summary), 'compaction'),
+          })
+        }
+      }
+
+      // 2. 若该事件已被压缩遮蔽，或者其本身是日志末尾存证的 compaction/summary，则在模型视界中跳过
+      if (shadowedSeqs.has(event.seq) || event.type === 'compaction/summary') {
+        continue
+      }
+
       switch (event.type) {
         case 'user/message': {
           messages.push({ role: 'user', content: structuredClone(event.data.content) })

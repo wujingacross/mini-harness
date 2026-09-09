@@ -11,10 +11,17 @@ interface ToolCallItem {
 }
 
 interface TimelineItem {
-  kind: 'user' | 'think' | 'tool' | 'text' | 'error'
+  kind: 'user' | 'think' | 'tool' | 'text' | 'error' | 'compaction'
   id: string
   content?: string
   tool?: ToolCallItem
+  compactionData?: {
+    compactionId: string
+    shadowedSeqsCount: number
+    shadowedRange: { start: number; end: number }
+    shadowedTokenCount: number
+    summary: string
+  }
 }
 
 /**
@@ -79,7 +86,7 @@ const MessageActionToolbar: React.FC<{ content: string }> = ({ content }) => {
 }
 
 export const TrajectoryStream: React.FC = () => {
-  const { events, activeTab, sendPrompt } = useSession()
+  const { events, activeTab, sendPrompt, isRunning, telemetry } = useSession()
   const streamEndRef = useRef<HTMLDivElement | null>(null)
   const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({})
 
@@ -192,6 +199,21 @@ export const TrajectoryStream: React.FC = () => {
             list.push({ kind: 'tool', id: block.id, tool: item })
           }
         }
+      } else if (evt.type === 'compaction/summary') {
+        flushStreamingThink()
+        flushStreamingText()
+        const summaryText = evt.data.summary?.map((b: any) => b.text || '').join('\n') || ''
+        list.push({
+          kind: 'compaction',
+          id: `compact_${evt.seq ?? list.length}`,
+          compactionData: {
+            compactionId: evt.data.compactionId,
+            shadowedSeqsCount: evt.data.shadowedSeqs?.length || 0,
+            shadowedRange: evt.data.shadowedRange || { start: 0, end: 0 },
+            shadowedTokenCount: evt.data.shadowedTokenCount || 0,
+            summary: summaryText,
+          },
+        })
       } else if (evt.type === 'turn/end' && evt.data?.reason?.kind === 'error') {
         flushStreamingThink()
         flushStreamingText()
@@ -214,7 +236,7 @@ export const TrajectoryStream: React.FC = () => {
 
   const visibleItems = useMemo(() => {
     if (activeTab === 'trajectory') {
-      return items.filter((it) => it.kind === 'think' || it.kind === 'tool')
+      return items.filter((it) => it.kind === 'think' || it.kind === 'tool' || it.kind === 'compaction')
     }
     return items
   }, [items, activeTab])
@@ -414,8 +436,56 @@ export const TrajectoryStream: React.FC = () => {
             )
           }
 
+          if (item.kind === 'compaction' && item.compactionData) {
+            const data = item.compactionData
+            const isExpanded = !!expandedTools[item.id]
+            return (
+              <div
+                key={item.id}
+                className="my-3 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50/90 to-indigo-50/70 p-3 text-xs text-blue-900 shadow-2xs transition select-none"
+              >
+                <div
+                  onClick={() => toggleToolExpand(item.id)}
+                  className="flex items-center justify-between cursor-pointer"
+                >
+                  <div className="flex items-center gap-2 font-medium">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-md bg-blue-600 text-white text-[10px]">
+                      <i className="fa-solid fa-box-archive"></i>
+                    </span>
+                    <span className="font-semibold text-blue-950">历史上下文已压缩 (Compaction)</span>
+                    <span className="rounded bg-blue-100/80 px-1.5 py-0.5 text-[10px] font-mono text-blue-700">
+                      折叠 {data.shadowedSeqsCount} 条事件 · 释放 ~{data.shadowedTokenCount} tokens
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px] text-blue-600 hover:text-blue-800 font-medium">
+                    <span>{isExpanded ? '收起摘要' : '查看压缩摘要'}</span>
+                    <i
+                      className={`fa-solid fa-chevron-right text-[9px] transition-transform ${
+                        isExpanded ? 'rotate-90' : ''
+                      }`}
+                    ></i>
+                  </div>
+                </div>
+
+                {isExpanded && (
+                  <div className="mt-2.5 pt-2.5 border-t border-blue-200/60 font-sans text-slate-700 select-text leading-relaxed">
+                    <MarkdownView content={data.summary} />
+                  </div>
+                )}
+              </div>
+            )
+          }
+
           return null
         })
+      )}
+      {isRunning && (
+        <div className="flex items-center gap-2.5 py-2 px-3.5 my-2 rounded-xl bg-blue-50/80 border border-blue-100 text-xs text-blue-700 select-none animate-pulse w-max">
+          <i className="fa-solid fa-circle-notch fa-spin text-blue-600 text-xs"></i>
+          <span className="font-medium">
+            智能体正在思考与执行循环 (第 {telemetry.turns || 1} 轮 · 第 {telemetry.steps || 1} 步)...
+          </span>
+        </div>
       )}
       <div ref={streamEndRef} />
     </div>

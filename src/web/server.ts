@@ -417,6 +417,28 @@ export class WebServer extends Service {
       return
     }
 
+    // POST /api/sessions/:id/compact - Trigger Manual Compaction
+    const compactMatch = pathname.match(/^\/api\/sessions\/([^/]+)\/compact$/)
+    if (compactMatch && method === 'POST') {
+      const sessionId = compactMatch[1]!
+      const agent = this.getOrCreateAgent(sessionId)
+      const compaction = this.ctx.get('compaction') as any
+      if (!compaction) {
+        res.writeHead(400, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: 'Compaction service is not enabled on this server' }))
+        return
+      }
+      try {
+        const result = await compaction.compactNow(agent)
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ status: result ? 'compacted' : 'noop', result, sessionId }))
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: err?.message || String(err), sessionId }))
+      }
+      return
+    }
+
     // GET /api/files - List Workspace Files
     if (pathname === '/api/files' && method === 'GET') {
       const files = await this.listWorkspaceFiles(this.workspaceDir)

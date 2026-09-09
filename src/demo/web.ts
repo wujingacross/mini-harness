@@ -12,6 +12,7 @@ import { createSearchTools } from '../tools/search.js'
 import { JsonlSessionPersistence } from '../session-persistence/jsonl.js'
 import AgentRegistry from '../agent/index.js'
 import AgentLoop from '../agent-loop/index.js'
+import CompactionEngine from '../compaction/index.js'
 import { existsSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import WebServer from '../web/index.js'
@@ -57,6 +58,7 @@ async function main() {
   await ctx.plugin(JsonlSessionPersistence, { storageDir })
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(AgentLoop)
+  await ctx.plugin(CompactionEngine)
 
   // 3. 注册系统提示词
   ctx.systemPrompt.section({
