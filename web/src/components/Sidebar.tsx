@@ -6,6 +6,15 @@ interface SidebarProps {
   onToggleCollapse: () => void
 }
 
+function formatRelativeTime(createdAt?: number): string {
+  if (!createdAt) return '刚刚'
+  const diff = Date.now() - createdAt
+  if (diff < 60000) return '刚刚'
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`
+  return `${Math.floor(diff / 86400000)}天`
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse }) => {
   const { sessions, currentSessionId, switchSession, createSession } = useSession()
 
@@ -147,7 +156,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse 
                 }`}
               >
                 <span className="truncate pr-2">{displayName}</span>
-                <span className="text-[10px] text-slate-400 shrink-0 font-normal">刚刚</span>
+                <span className="text-[10px] text-slate-400 shrink-0 font-normal">
+                  {formatRelativeTime(ses.createdAt)}
+                </span>
               </div>
             )
           })}

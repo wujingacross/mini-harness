@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 export interface SessionHeader {
   id: string
   title?: string
+  createdAt?: number
   eventsCount: number
 }
 
@@ -67,6 +68,25 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     es.onmessage = (msg) => {
       try {
         const event = JSON.parse(msg.data)
+
+        if (event.type === 'user/message') {
+          // Avoid duplicate user message if already optimistically added
+          setEvents((prev) => {
+            const hasSame = prev.some((e) => {
+              if (e.type !== 'user/message') return false
+              const prevText = typeof e.data?.content === 'string'
+                ? e.data.content
+                : e.data?.content?.[0]?.text
+              const newText = typeof event.data?.content === 'string'
+                ? event.data.content
+                : event.data?.content?.[0]?.text
+              return prevText === newText
+            })
+            return hasSame ? prev : [...prev, event]
+          })
+          return
+        }
+
         setEvents((prev) => [...prev, event])
 
         if (event.type === 'turn/start') {
@@ -111,8 +131,16 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const res = await fetch('/api/sessions', { method: 'POST' })
       if (res.ok) {
         const data = await res.json()
-        await loadSessions()
+        const newHeader: SessionHeader = {
+          id: data.sessionId,
+          title: '新会话',
+          createdAt: Date.now(),
+          eventsCount: 0,
+        }
+        // Place new session immediately at the top of the sessions list!
+        setSessions((prev) => [newHeader, ...prev.filter((s) => s.id !== data.sessionId)])
         await switchSession(data.sessionId)
+        loadSessions()
       }
     } catch (err) {
       console.error('Failed to create session:', err)
@@ -130,7 +158,27 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     if (!targetSessionId) return
-    connectSSE(targetSessionId)
+
+    // 1. Optimistically append user message so it appears immediately in the main conversation area!
+    const userEvent: SessionEvent = {
+      type: 'user/message',
+      data: { content: [{ type: 'text', text }], source: 'user' },
+    }
+    setEvents((prev) => [...prev, userEvent])
+
+    // 2. Optimistically update session title in sidebar and header if it was '新会话'
+    setSessions((prev) =>
+      prev.map((s) =>
+        s.id === targetSessionId && (!s.title || s.title === '新会话')
+          ? { ...s, title: text.slice(0, 32) }
+          : s
+      )
+    )
+
+    // 3. Ensure SSE connection is active without closing/restarting
+    if (!eventSourceRef.current) {
+      connectSSE(targetSessionId)
+    }
 
     setIsRunning(true)
     try {

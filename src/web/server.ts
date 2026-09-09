@@ -220,13 +220,15 @@ export class WebServer extends Service {
     if (pathname === '/api/sessions' && method === 'GET') {
       const activeIds = this.ctx.sessions.list()
       const persistence = this.ctx.get('sessionPersistence') as SessionPersistenceService | undefined
-      let persistedIds: string[] = []
+      const headerMap = new Map<string, any>()
       if (persistence) {
         const headers = await persistence.list()
-        persistedIds = headers.map((h) => h.id)
+        for (const h of headers) {
+          headerMap.set(h.id, h)
+        }
       }
 
-      const allIds = Array.from(new Set([...activeIds, ...persistedIds]))
+      const allIds = Array.from(new Set([...activeIds, ...headerMap.keys()]))
       const sessionList = await Promise.all(
         allIds.map(async (id) => {
           let ses = this.ctx.sessions.get(id)
@@ -256,13 +258,24 @@ export class WebServer extends Service {
             title = id.startsWith('ses_') ? '新会话' : id
           }
 
+          const createdAt = ses?.header?.createdAt || headerMap.get(id)?.createdAt || 0
+
           return {
             id,
             title: title.slice(0, 32),
+            createdAt,
             eventsCount: ses?.events.length || 0,
           }
         })
       )
+
+      // Sort by createdAt descending (newest at the top)
+      sessionList.sort((a, b) => {
+        if (b.createdAt !== a.createdAt) {
+          return b.createdAt - a.createdAt
+        }
+        return b.id.localeCompare(a.id)
+      })
 
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ sessions: sessionList }))
