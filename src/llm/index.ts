@@ -48,7 +48,19 @@ export class LlmService extends Service {
   }
 
   async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
-    const adapter = this.adapters.get(options.model) || this.defaultAdapter
+    let adapter = this.adapters.get(options.model)
+    if (!adapter) {
+      if (options.model.startsWith('glm') || options.model.startsWith('chatglm')) {
+        throw new Error(`检测到您请求了智谱 GLM 模型 "${options.model}"，但环境变量中未配置有效的 GLM_API_KEY 或 ZHIPU_API_KEY。请在 .env 中配置 GLM_API_KEY=your_key 后重启服务。`)
+      }
+      if (options.model.startsWith('qwen')) {
+        throw new Error(`检测到您请求了阿里通义千问模型 "${options.model}"，但环境变量中未配置有效的 DASHSCOPE_API_KEY 或 QWEN_API_KEY。请在 .env 中配置 DASHSCOPE_API_KEY=your_key 后重启服务。`)
+      }
+      if (options.model.startsWith('gpt') || options.model.startsWith('o1')) {
+        throw new Error(`检测到您请求了 OpenAI 模型 "${options.model}"，但环境变量中未配置有效的 OPENAI_API_KEY。请在 .env 中配置 OPENAI_API_KEY=your_key 后重启服务。`)
+      }
+      adapter = this.defaultAdapter
+    }
     if (!adapter) {
       throw new Error(`No adapter registered for model "${options.model}". Registered models: [${Array.from(this.adapters.keys()).join(', ')}]`)
     }

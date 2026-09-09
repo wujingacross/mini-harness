@@ -11,7 +11,7 @@ interface ToolCallItem {
 }
 
 interface TimelineItem {
-  kind: 'user' | 'think' | 'tool' | 'text'
+  kind: 'user' | 'think' | 'tool' | 'text' | 'error'
   id: string
   content?: string
   tool?: ToolCallItem
@@ -192,6 +192,14 @@ export const TrajectoryStream: React.FC = () => {
             list.push({ kind: 'tool', id: block.id, tool: item })
           }
         }
+      } else if (evt.type === 'turn/end' && evt.data?.reason?.kind === 'error') {
+        flushStreamingThink()
+        flushStreamingText()
+        list.push({
+          kind: 'error',
+          id: `error_${list.length}`,
+          content: evt.data.reason.message || '模型调用执行失败',
+        })
       }
     }
 
@@ -385,6 +393,23 @@ export const TrajectoryStream: React.FC = () => {
                 <MarkdownView content={item.content} />
                 {/* Red Box 4: Message Actions Toolbar */}
                 <MessageActionToolbar content={item.content} />
+              </div>
+            )
+          }
+
+          if (item.kind === 'error') {
+            return (
+              <div
+                key={item.id}
+                className="my-3 p-3.5 rounded-xl border border-red-200 bg-red-50/90 text-red-700 text-xs flex items-start gap-2.5 shadow-2xs select-text"
+              >
+                <i className="fa-solid fa-triangle-exclamation text-red-500 text-sm shrink-0 mt-0.5"></i>
+                <div className="flex-1 space-y-1">
+                  <div className="font-semibold text-[13px] text-red-800">请求失败 / 模型接口异常</div>
+                  <div className="text-[12px] font-mono leading-relaxed whitespace-pre-wrap text-red-700">
+                    {item.content}
+                  </div>
+                </div>
               </div>
             )
           }

@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { BashExecutor, type BashRunOptions, type BashRunResult } from './types.js'
 
 export interface LocalBashConfig {
@@ -11,7 +12,8 @@ export interface LocalBashConfig {
  * 工业级本地 Bash 执行器：
  * 1. 进程组隔离（detached: true）与级联清理（kill -pid），杜绝孤儿/僵尸子进程；
  * 2. 内存输出上限截断（Output Truncation），保护大模型上下文窗口；
- * 3. 超时强杀（Timeout Escalation：SIGTERM -> SIGKILL）与异步取消（AbortSignal）支持。
+ * 3. 超时强杀（Timeout Escalation：SIGTERM -> SIGKILL）与异步取消（AbortSignal）支持；
+ * 4. 目录安全容错：当模型传入不存在的路径（如 /workspace）时自动回退到项目真实根目录。
  */
 export class LocalBashExecutor extends BashExecutor {
   private defaultCwd: string
@@ -26,7 +28,10 @@ export class LocalBashExecutor extends BashExecutor {
   }
 
   async run(options: BashRunOptions): Promise<BashRunResult> {
-    const cwd = options.cwd || this.defaultCwd
+    let cwd = options.cwd || this.defaultCwd
+    if (!existsSync(cwd)) {
+      cwd = this.defaultCwd
+    }
     const timeoutMs = options.timeoutMs ?? this.defaultTimeoutMs
 
     return new Promise<BashRunResult>((resolve, reject) => {
