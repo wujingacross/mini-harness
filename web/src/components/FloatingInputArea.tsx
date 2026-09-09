@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useSession } from '../context/SessionContext'
 
 export const FloatingInputArea: React.FC = () => {
@@ -6,6 +6,23 @@ export const FloatingInputArea: React.FC = () => {
   const [text, setText] = useState('')
   const [selectedModel, setSelectedModel] = useState('deepseek-chat')
   const [showModelDropdown, setShowModelDropdown] = useState(false)
+  const [availableModels, setAvailableModels] = useState<string[]>([
+    'deepseek-chat',
+    'deepseek-reasoner',
+    'glm-4-flash',
+    'qwen-plus',
+  ])
+
+  useEffect(() => {
+    fetch('/api/models')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data?.models) && data.models.length > 0) {
+          setAvailableModels((prev) => Array.from(new Set([...data.models, ...prev])))
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   const handleSubmit = () => {
     const trimmed = text.trim()
@@ -25,6 +42,16 @@ export const FloatingInputArea: React.FC = () => {
     const msg = window.prompt('输入中途纠偏指令 (Steering):')
     if (msg?.trim()) {
       steer(msg.trim())
+    }
+  }
+
+  const handleAddCustomModel = () => {
+    const custom = window.prompt('输入自定义模型标识 (如 glm-4-flash, qwen-plus, gpt-4o 等):')
+    if (custom?.trim()) {
+      const modelName = custom.trim()
+      setAvailableModels((prev) => [modelName, ...prev.filter((m) => m !== modelName)])
+      setSelectedModel(modelName)
+      setShowModelDropdown(false)
     }
   }
 
@@ -70,22 +97,53 @@ export const FloatingInputArea: React.FC = () => {
 
             {/* Model Dropdown Popup */}
             {showModelDropdown && (
-              <div className="absolute right-20 bottom-8 w-40 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-30 text-xs">
-                {['deepseek-chat', 'deepseek-reasoner'].map((m) => (
-                  <div
-                    key={m}
-                    onClick={() => {
-                      setSelectedModel(m)
-                      setShowModelDropdown(false)
-                    }}
-                    className={`px-3 py-1.5 hover:bg-slate-100 cursor-pointer font-mono text-[11px] flex items-center justify-between ${
-                      selectedModel === m ? 'text-blue-600 font-semibold bg-blue-50/50' : 'text-slate-700'
-                    }`}
-                  >
-                    <span>{m}</span>
-                    {selectedModel === m && <i className="fa-solid fa-check text-[10px]"></i>}
-                  </div>
-                ))}
+              <div className="absolute right-20 bottom-8 w-48 bg-white border border-slate-200 rounded-lg shadow-xl py-1 z-30 text-xs max-h-64 overflow-y-auto">
+                <div className="px-3 py-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                  选择模型 / 供应商
+                </div>
+                {availableModels.map((m) => {
+                  let badge = 'LLM'
+                  let badgeColor = 'bg-slate-100 text-slate-600'
+                  if (m.includes('deepseek')) {
+                    badge = 'DeepSeek'
+                    badgeColor = 'bg-blue-50 text-blue-600 border border-blue-100'
+                  } else if (m.includes('glm')) {
+                    badge = '智谱GLM'
+                    badgeColor = 'bg-purple-50 text-purple-600 border border-purple-100'
+                  } else if (m.includes('qwen')) {
+                    badge = '通义千问'
+                    badgeColor = 'bg-amber-50 text-amber-700 border border-amber-100'
+                  } else if (m.includes('gpt') || m.includes('o1')) {
+                    badge = 'OpenAI'
+                    badgeColor = 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                  }
+
+                  return (
+                    <div
+                      key={m}
+                      onClick={() => {
+                        setSelectedModel(m)
+                        setShowModelDropdown(false)
+                      }}
+                      className={`px-3 py-1.5 hover:bg-slate-100 cursor-pointer text-[11px] flex items-center justify-between transition ${
+                        selectedModel === m ? 'text-blue-600 font-semibold bg-blue-50/50' : 'text-slate-700'
+                      }`}
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-mono text-xs truncate max-w-[110px]">{m}</span>
+                        <span className={`text-[9px] px-1 py-0.2 rounded w-max mt-0.5 ${badgeColor}`}>{badge}</span>
+                      </div>
+                      {selectedModel === m && <i className="fa-solid fa-check text-[10px] text-blue-600"></i>}
+                    </div>
+                  )
+                })}
+                <div
+                  onClick={handleAddCustomModel}
+                  className="px-3 py-1.5 hover:bg-slate-100 cursor-pointer text-slate-600 text-[11px] font-medium border-t border-slate-100 flex items-center gap-1.5 text-blue-600"
+                >
+                  <i className="fa-solid fa-plus text-[10px]"></i>
+                  <span>输入自定义模型...</span>
+                </div>
               </div>
             )}
 

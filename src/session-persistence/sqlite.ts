@@ -175,4 +175,16 @@ export class SqliteSessionPersistence extends SessionPersistence {
       parentSession: r.parent_session ?? undefined,
     }))
   }
+
+  async delete(sessionId: string): Promise<boolean> {
+    this.writeBuffers.delete(sessionId)
+    this.sessionHeaders.delete(sessionId)
+    try {
+      this.db.prepare('DELETE FROM session_events WHERE session_id = ?').run(sessionId)
+      this.db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId)
+      return true
+    } catch {
+      return false
+    }
+  }
 }

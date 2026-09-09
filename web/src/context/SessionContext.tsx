@@ -186,14 +186,18 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const deleteSession = useCallback(
     async (sessionId: string) => {
       try {
-        await fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' })
+        const res = await fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' })
+        if (!res.ok) {
+          console.error(`Failed to delete session ${sessionId}: ${res.status} ${res.statusText}`)
+          return
+        }
         setSessions((prev) => prev.filter((s) => s.id !== sessionId))
         if (currentSessionId === sessionId) {
           const remaining = sessions.filter((s) => s.id !== sessionId)
           if (remaining.length > 0) {
-            switchSession(remaining[0].id)
+            await switchSession(remaining[0].id)
           } else {
-            createSession()
+            await createSession()
           }
         }
       } catch (err) {

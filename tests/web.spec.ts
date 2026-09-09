@@ -232,4 +232,20 @@ describe('Milestone 7: Web UI Server & Dashboard', () => {
     expect(getRes.status).toBe(404)
     expect(ctx.webServer['activeAgents'].has(sessionId)).toBe(false)
   })
+
+  it('provides available models via GET /api/models and CORS DELETE support', async () => {
+    const { serverUrl } = await startTestServer()
+
+    // 1. GET /api/models
+    const modelsRes = await fetch(`${serverUrl}/api/models`)
+    expect(modelsRes.status).toBe(200)
+    const modelsData = await modelsRes.json()
+    expect(Array.isArray(modelsData.models)).toBe(true)
+    expect(modelsData.models).toContain('mock')
+
+    // 2. OPTIONS request has DELETE in Access-Control-Allow-Methods
+    const optionsRes = await fetch(`${serverUrl}/api/sessions/test`, { method: 'OPTIONS' })
+    expect(optionsRes.status).toBe(204)
+    expect(optionsRes.headers.get('access-control-allow-methods')).toContain('DELETE')
+  })
 })

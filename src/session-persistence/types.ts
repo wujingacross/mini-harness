@@ -14,5 +14,5 @@ export abstract class SessionPersistenceService {
   abstract append(sessionId: string, events: readonly SessionEvent[]): Promise<void>
   abstract load(sessionId: string): Promise<StoredSession>
   abstract list(): Promise<SessionHeader[]>
-  abstract delete?(sessionId: string): Promise<boolean>
+  abstract delete(sessionId: string): Promise<boolean>
 }

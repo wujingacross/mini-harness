@@ -149,11 +149,12 @@ export class JsonlSessionPersistence extends SessionPersistence {
   }
 
   async delete(sessionId: string): Promise<boolean> {
+    this.writeBuffers.delete(sessionId)
+    this.sessionHeaders.delete(sessionId)
     await this.ensureStorageDir()
     const filePath = this.getFilePath(sessionId)
     try {
       await fs.unlink(filePath)
-      this.sessionHeaders.delete(sessionId)
       return true
     } catch {
       return false

@@ -4,7 +4,7 @@ import SessionStore from '../session/index.js'
 import SystemPrompt from '../system-prompt/index.js'
 import ToolRegistry from '../tools/index.js'
 import LlmService from '../llm/index.js'
-import { DeepSeekAdapter } from '../llm/deepseek.js'
+import { DeepSeekAdapter, OpenAiCompatibleAdapter } from '../llm/deepseek.js'
 import BashService from '../bash/index.js'
 import { createBashTool } from '../tools/bash.js'
 import { createFileTools } from '../tools/file.js'
@@ -79,9 +79,41 @@ Guidelines:
 5. Provide concise, accurate, and direct responses.`,
   })
 
-  // 4. 挂载真实 DeepSeek LLM 适配器
+  // 4. 挂载真实 LLM 适配器体系 (支持 DeepSeek、智谱 GLM、阿里通义千问 Qwen、OpenAI、本地 Ollama)
   const deepseekAdapter = new DeepSeekAdapter({ apiKey, baseURL })
   ctx.llm.registerAdapter([modelName, 'deepseek-chat', 'deepseek-reasoner', 'deepseek-coder'], deepseekAdapter)
+  ctx.llm.setDefaultAdapter(deepseekAdapter)
+
+  // 可选加载 智谱 GLM (BigModel)
+  const glmKey = process.env.GLM_API_KEY || process.env.ZHIPU_API_KEY
+  if (glmKey) {
+    const glmBase = process.env.GLM_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4'
+    const glmAdapter = new OpenAiCompatibleAdapter({ apiKey: glmKey, baseURL: glmBase })
+    ctx.llm.registerAdapter(['glm-4-flash', 'glm-4-plus', 'glm-4-air', 'glm-4-long', 'glm-4-0520'], glmAdapter)
+  }
+
+  // 可选加载 阿里通义千问 Qwen (DashScope)
+  const qwenKey = process.env.QWEN_API_KEY || process.env.DASHSCOPE_API_KEY
+  if (qwenKey) {
+    const qwenBase = process.env.QWEN_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+    const qwenAdapter = new OpenAiCompatibleAdapter({ apiKey: qwenKey, baseURL: qwenBase })
+    ctx.llm.registerAdapter(['qwen-plus', 'qwen-turbo', 'qwen-coder-plus', 'qwen-max'], qwenAdapter)
+  }
+
+  // 可选加载 OpenAI 官方或中转
+  const openaiKey = process.env.OPENAI_API_KEY
+  if (openaiKey) {
+    const openaiBase = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1'
+    const openaiAdapter = new OpenAiCompatibleAdapter({ apiKey: openaiKey, baseURL: openaiBase })
+    ctx.llm.registerAdapter(['gpt-4o', 'gpt-4o-mini', 'o1-mini'], openaiAdapter)
+  }
+
+  // 可选加载 本地 Ollama / vLLM
+  const ollamaBase = process.env.OLLAMA_BASE_URL
+  if (ollamaBase) {
+    const ollamaAdapter = new OpenAiCompatibleAdapter({ apiKey: 'ollama', baseURL: ollamaBase })
+    ctx.llm.registerAdapter(['qwen2.5-coder:7b', 'deepseek-r1:8b', 'llama3.1:8b'], ollamaAdapter)
+  }
 
   // 5. 注册本地 Bash、文件读写与搜索工具
   const bashTool = createBashTool(ctx)

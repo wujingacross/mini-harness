@@ -18,9 +18,18 @@ declare module 'cordis' {
 
 export class LlmService extends Service {
   private adapters = new Map<string, LlmAdapter>()
+  private defaultAdapter?: LlmAdapter
 
   constructor(ctx: Context) {
     super(ctx, 'llm')
+  }
+
+  setDefaultAdapter(adapter: LlmAdapter): void {
+    this.defaultAdapter = adapter
+  }
+
+  getDefaultAdapter(): LlmAdapter | undefined {
+    return this.defaultAdapter
   }
 
   registerAdapter(models: string[], adapter: LlmAdapter): () => void {
@@ -34,8 +43,12 @@ export class LlmService extends Service {
     }
   }
 
+  listModels(): string[] {
+    return Array.from(this.adapters.keys())
+  }
+
   async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
-    const adapter = this.adapters.get(options.model)
+    const adapter = this.adapters.get(options.model) || this.defaultAdapter
     if (!adapter) {
       throw new Error(`No adapter registered for model "${options.model}". Registered models: [${Array.from(this.adapters.keys()).join(', ')}]`)
     }

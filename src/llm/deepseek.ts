@@ -2,10 +2,12 @@ import { LlmAdapter, type GenerateOptions } from './types.js'
 import type { StreamChunk, TokenUsage, FinishReason } from '../types/stream.js'
 import type { Message, ContentBlock } from '../types/blocks.js'
 
-export interface DeepSeekAdapterOptions {
+export interface OpenAiCompatibleAdapterOptions {
   apiKey: string
   baseURL?: string
 }
+
+export type DeepSeekAdapterOptions = OpenAiCompatibleAdapterOptions
 
 interface WireToolCall {
   index: number
@@ -37,17 +39,18 @@ interface WireChunk {
 }
 
 /**
- * 真实 DeepSeek API 流式适配器：
- * 1. 原生支持 DeepSeek-R1 / DeepSeek-V3 推理与代码模型（含 reasoning_content 深度思考流与 content 回复流）；
- * 2. 支持 Function Calling 多工具调用流式切片拼装与参数增量下发；
- * 3. 严格解析 Server-Sent Events (SSE) 协议、Token Usage 统计与 [DONE] 终止符；
- * 4. 完整的网络异常转换与 AbortSignal 取消传递。
+ * 通用 OpenAI 兼容 / DeepSeek API 流式适配器：
+ * 1. 原生支持 DeepSeek (V3/R1)、智谱 GLM (GLM-4)、阿里通义千问 Qwen (Qwen-Plus/QwQ)、官方 OpenAI (GPT-4o)、本地 Ollama 等所有兼容标准 /chat/completions 接口的模型；
+ * 2. 自动兼容 reasoning_content 深度思考流与 content 文本生成流；
+ * 3. 完整支持 Function Calling 多工具调用流式切片拼装与参数增量下发；
+ * 4. 严格解析 Server-Sent Events (SSE) 协议、Token Usage 统计与 [DONE] 终止符；
+ * 5. 完整的网络异常转换与 AbortSignal 取消传递。
  */
-export class DeepSeekAdapter extends LlmAdapter {
-  private apiKey: string
-  private baseURL: string
+export class OpenAiCompatibleAdapter extends LlmAdapter {
+  protected apiKey: string
+  protected baseURL: string
 
-  constructor(options: DeepSeekAdapterOptions) {
+  constructor(options: OpenAiCompatibleAdapterOptions) {
     super()
     this.apiKey = options.apiKey
     this.baseURL = (options.baseURL || 'https://api.deepseek.com').replace(/\/+$/, '')
@@ -299,3 +302,6 @@ export class DeepSeekAdapter extends LlmAdapter {
     yield { type: 'finish', reason: finishReason ?? { kind: 'stop' } }
   }
 }
+
+export class DeepSeekAdapter extends OpenAiCompatibleAdapter {}
+
