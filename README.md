@@ -157,6 +157,12 @@ Add to Zed's `settings.json`:
 - [x] **Milestone 4**: Editor Integration (ACP - Agent Client Protocol JSON-RPC for Zed/IDE)
 - [x] **Milestone 5**: Hardening (Invariants contract verification, Cancellation, Mid-turn Steering)
 - [x] **Milestone 6 (v1.1.0)**: Dedicated Code Editing & Discovery Tools (`view_file`, `replace_file_content`, `find_by_name`, `grep_search`)
+- [x] **Milestone 7 (v1.2.0)**: Modern React 19 Web Console (Trajectory Stream, Collapsible Tool Inspection, Real-time Telemetry, Dynamic Model Switch, Full-height Sidebar)
+- [ ] **Milestone 8**: Context Compaction & Token Management (`@deepseek-ai/dsh-compaction`)
+- [ ] **Milestone 9**: Plan Mode & Structured Todo Tracking (`@deepseek-ai/dsh-plan`, `@deepseek-ai/dsh-todo`)
+- [ ] **Milestone 10**: Human-in-the-Loop Interaction & Sensitive Tool Approval (`@deepseek-ai/dsh-interaction`)
+- [ ] **Milestone 11**: Dynamic Skill System & Progressive Loading (`@deepseek-ai/dsh-skill`)
+- [ ] **Milestone 12**: Subagent & Multi-Agent Task Delegation (`@deepseek-ai/dsh-subagent`)
 
 ---
 
@@ -168,6 +174,8 @@ Add to Zed's `settings.json`:
 * 📖 [Milestone 4 Modern IDE Integration & ACP Gateway Guide](docs/04-milestone4-acp-ide-integration.md)
 * 📖 [Milestone 5 System Resilience & Hardening Guide](docs/05-milestone5-resilience-and-hardening.md)
 * 📖 [Milestone 6 Code Editing & Search Toolchain Guide](docs/06-milestone6-code-editing-and-search-tools.md)
+* 📖 [Milestone 7 React 19 Web Console & Trajectory Stream Guide](docs/07-milestone7-web-ui-interaction.md)
+* 🧭 [Milestones 8 ~ 12 Future Architectural Roadmap](docs/08-future-milestones-roadmap.md)
 
 ---
 

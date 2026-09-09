@@ -16,7 +16,7 @@ function formatRelativeTime(createdAt?: number): string {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse }) => {
-  const { sessions, currentSessionId, switchSession, createSession } = useSession()
+  const { sessions, currentSessionId, switchSession, createSession, deleteSession } = useSession()
 
   if (isCollapsed) {
     return (
@@ -149,16 +149,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse 
               <div
                 key={ses.id}
                 onClick={() => switchSession(ses.id)}
-                className={`px-2.5 py-1.5 rounded-lg text-xs cursor-pointer flex items-center justify-between transition select-none ${
+                className={`group px-2.5 py-1.5 rounded-lg text-xs cursor-pointer flex items-center justify-between transition select-none ${
                   isCurrent
                     ? 'bg-slate-100 text-slate-900 font-medium'
                     : 'hover:bg-slate-100/60 text-slate-600 hover:text-slate-900'
                 }`}
               >
                 <span className="truncate pr-2">{displayName}</span>
-                <span className="text-[10px] text-slate-400 shrink-0 font-normal">
-                  {formatRelativeTime(ses.createdAt)}
-                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-[10px] text-slate-400 group-hover:hidden font-normal">
+                    {formatRelativeTime(ses.createdAt)}
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      deleteSession(ses.id)
+                    }}
+                    className="hidden group-hover:flex w-5 h-5 rounded items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition cursor-pointer"
+                    title="删除会话"
+                  >
+                    <i className="fa-regular fa-trash-can text-[10px]"></i>
+                  </button>
+                </div>
               </div>
             )
           })}

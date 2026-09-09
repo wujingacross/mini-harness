@@ -79,8 +79,13 @@ const MessageActionToolbar: React.FC<{ content: string }> = ({ content }) => {
 }
 
 export const TrajectoryStream: React.FC = () => {
-  const { events, activeTab } = useSession()
+  const { events, activeTab, sendPrompt } = useSession()
   const streamEndRef = useRef<HTMLDivElement | null>(null)
+  const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({})
+
+  const toggleToolExpand = (toolId: string) => {
+    setExpandedTools((prev) => ({ ...prev, [toolId]: !prev[toolId] }))
+  }
 
   const items = useMemo(() => {
     const list: TimelineItem[] = []
@@ -207,108 +212,186 @@ export const TrajectoryStream: React.FC = () => {
   }, [items, activeTab])
 
   return (
-    <div className="flex-1 overflow-y-auto px-16 py-8 space-y-2 max-w-4xl w-full mx-auto select-text font-sans">
-      {visibleItems.map((item) => {
-        if (item.kind === 'user') {
-          return (
-            <div
-              key={item.id}
-              className="flex items-baseline gap-2 pt-6 pb-2.5 border-b border-slate-100 mb-2 font-semibold text-slate-900"
-            >
-              <span className="text-blue-600 text-sm">
-                <i className="fa-solid fa-circle-user"></i>
-              </span>
-              <span className="text-blue-600 font-bold text-sm">User</span>
-              <span className="text-slate-300">·</span>
-              <span className="text-slate-900 font-normal text-sm whitespace-pre-wrap leading-relaxed">
-                {item.content}
-              </span>
-            </div>
-          )
-        }
+    <div className="flex-1 overflow-y-auto px-16 py-8 space-y-2 max-w-4xl w-full mx-auto select-text font-sans flex flex-col justify-start">
+      {visibleItems.length === 0 ? (
+        <div className="my-auto flex flex-col items-center justify-center py-16 text-center select-none">
+          {/* DeepSeek Whale Logo */}
+          <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg mb-4 shadow-blue-500/20">
+            <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-slate-800 mb-1.5 tracking-tight">DeepSeek Harness</h2>
+          <p className="text-xs text-slate-500 max-w-md mb-8 leading-relaxed">
+            基于 Cordis 微内核架构的智能编程 Agent，具备自主代码编写、文件浏览、工具调度与测试验证能力。
+          </p>
 
-        if (item.kind === 'think') {
-          return (
-            <div
-              key={item.id}
-              className="flex items-baseline gap-2 py-0.5 text-[13px] text-slate-500 font-normal leading-relaxed"
-            >
-              <span className="text-slate-400 shrink-0 text-xs">⬡</span>
-              <span className="text-slate-600 font-medium">Think</span>
-              <span className="text-slate-300">·</span>
-              <span className="text-slate-500 whitespace-pre-wrap leading-relaxed">{item.content}</span>
-            </div>
-          )
-        }
-
-        if (item.kind === 'tool' && item.tool) {
-          const tool = item.tool
-          let icon = 'fa-terminal'
-          let label = 'Tool'
-          let paramText = ''
-
-          if (tool.name === 'view_file' || tool.name === 'read_file') {
-            icon = 'fa-file-lines'
-            label = 'Read'
-            paramText = tool.args?.path || ''
-          } else if (tool.name === 'replace_file_content' || tool.name === 'edit_file') {
-            icon = 'fa-pen-to-square'
-            label = 'Edit'
-            paramText = tool.args?.path || ''
-          } else if (tool.name === 'write_to_file') {
-            icon = 'fa-file-circle-plus'
-            label = 'Write'
-            paramText = tool.args?.path || ''
-          } else if (tool.name === 'find_by_name') {
-            icon = 'fa-magnifying-glass'
-            label = 'Glob'
-            paramText = tool.args?.pattern || ''
-          } else if (tool.name === 'grep_search') {
-            icon = 'fa-magnifying-glass'
-            label = 'Grep'
-            paramText = tool.args?.query || ''
-          } else if (tool.name === 'bash') {
-            icon = 'fa-terminal'
-            label = 'Bash'
-            paramText = tool.args?.command || ''
+          {/* Quick Prompt Pills */}
+          <div className="flex flex-col sm:flex-row gap-2.5 max-w-xl w-full justify-center">
+            {[
+              { icon: 'fa-folder-tree', text: '检查当前工作区的目录结构与核心文件' },
+              { icon: 'fa-code', text: '编写一个快速排序并添加单元测试' },
+              { icon: 'fa-vial-circle-check', text: '运行现有测试套件并分析测试结果' },
+            ].map((pill, idx) => (
+              <button
+                key={idx}
+                onClick={() => sendPrompt(pill.text)}
+                className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/40 text-slate-700 text-xs font-medium transition text-left shadow-2xs cursor-pointer group"
+              >
+                <i className={`fa-solid ${pill.icon} text-slate-400 group-hover:text-blue-600 transition`}></i>
+                <span className="truncate">{pill.text}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        visibleItems.map((item) => {
+          if (item.kind === 'user') {
+            return (
+              <div
+                key={item.id}
+                className="flex items-baseline gap-2 pt-6 pb-2.5 border-b border-slate-100 mb-2 font-semibold text-slate-900"
+              >
+                <span className="text-blue-600 text-sm">
+                  <i className="fa-solid fa-circle-user"></i>
+                </span>
+                <span className="text-blue-600 font-bold text-sm">User</span>
+                <span className="text-slate-300">·</span>
+                <span className="text-slate-900 font-normal text-sm whitespace-pre-wrap leading-relaxed">
+                  {item.content}
+                </span>
+              </div>
+            )
           }
 
-          return (
-            <div key={item.id} className="flex items-baseline gap-2 py-0.5 text-[13px] text-slate-700 leading-relaxed font-normal">
-              <span className="text-slate-400 shrink-0 text-xs">
-                <i className={`fa-solid ${icon}`}></i>
-              </span>
-              <span className="text-slate-800 font-medium">{label}</span>
-              <span className="text-slate-300">·</span>
-              <span
-                className={`font-mono text-xs text-slate-900 ${
-                  paramText.includes('/') ? 'hover:underline cursor-pointer' : ''
-                }`}
+          if (item.kind === 'think') {
+            return (
+              <div
+                key={item.id}
+                className="flex items-baseline gap-2 py-0.5 text-[13px] text-slate-500 font-normal leading-relaxed"
               >
-                {paramText || tool.name}
-              </span>
-              {tool.status === 'running' && (
-                <span className="ml-auto text-[10px] text-slate-400 font-normal">运行中...</span>
-              )}
-              {tool.status === 'failed' && (
-                <span className="ml-auto text-[10px] text-red-500 font-medium">失败</span>
-              )}
-            </div>
-          )
-        }
+                <span className="text-slate-400 shrink-0 text-xs">⬡</span>
+                <span className="text-slate-600 font-medium">Think</span>
+                <span className="text-slate-300">·</span>
+                <span className="text-slate-500 whitespace-pre-wrap leading-relaxed">{item.content}</span>
+              </div>
+            )
+          }
 
-        if (item.kind === 'text' && item.content) {
-          return (
-            <div key={item.id} className="py-2.5 my-1 text-slate-900">
-              <MarkdownView content={item.content} />
-              {/* Red Box 4: Message Actions Toolbar */}
-              <MessageActionToolbar content={item.content} />
-            </div>
-          )
-        }
+          if (item.kind === 'tool' && item.tool) {
+            const tool = item.tool
+            const isExpanded = !!expandedTools[item.id]
+            let icon = 'fa-terminal'
+            let label = 'Tool'
+            let paramText = ''
 
-        return null
-      })}
+            if (tool.name === 'view_file' || tool.name === 'read_file') {
+              icon = 'fa-file-lines'
+              label = 'Read'
+              paramText = tool.args?.path || tool.args?.AbsolutePath || ''
+            } else if (tool.name === 'replace_file_content' || tool.name === 'edit_file') {
+              icon = 'fa-pen-to-square'
+              label = 'Edit'
+              paramText = tool.args?.path || tool.args?.TargetFile || ''
+            } else if (tool.name === 'write_to_file') {
+              icon = 'fa-file-circle-plus'
+              label = 'Write'
+              paramText = tool.args?.path || tool.args?.TargetFile || ''
+            } else if (tool.name === 'find_by_name') {
+              icon = 'fa-magnifying-glass'
+              label = 'Glob'
+              paramText = tool.args?.pattern || tool.args?.Pattern || ''
+            } else if (tool.name === 'grep_search') {
+              icon = 'fa-magnifying-glass'
+              label = 'Grep'
+              paramText = tool.args?.query || tool.args?.Query || ''
+            } else if (tool.name === 'bash') {
+              icon = 'fa-terminal'
+              label = 'Bash'
+              paramText = tool.args?.command || tool.args?.CommandLine || ''
+            }
+
+            return (
+              <div key={item.id} className="py-0.5">
+                <div
+                  onClick={() => toggleToolExpand(item.id)}
+                  className="flex items-center gap-2 py-1 px-2 rounded-md hover:bg-slate-100/80 cursor-pointer text-[13px] text-slate-700 leading-relaxed font-normal transition select-none"
+                >
+                  <i
+                    className={`fa-solid fa-chevron-right text-[9px] text-slate-400 transition-transform ${
+                      isExpanded ? 'rotate-90 text-slate-600' : ''
+                    }`}
+                  ></i>
+                  <span className="text-slate-400 shrink-0 text-xs">
+                    <i className={`fa-solid ${icon}`}></i>
+                  </span>
+                  <span className="text-slate-800 font-medium">{label}</span>
+                  <span className="text-slate-300">·</span>
+                  <span
+                    className={`font-mono text-xs text-slate-900 truncate max-w-md ${
+                      paramText.includes('/') ? 'hover:underline' : ''
+                    }`}
+                  >
+                    {paramText || tool.name}
+                  </span>
+                  {tool.status === 'running' && (
+                    <span className="ml-auto text-[10px] text-blue-500 font-normal flex items-center gap-1">
+                      <i className="fa-solid fa-circle-notch fa-spin text-[9px]"></i>
+                      <span>执行中...</span>
+                    </span>
+                  )}
+                  {tool.status === 'failed' && (
+                    <span className="ml-auto text-[10px] text-red-500 font-medium">失败</span>
+                  )}
+                  {tool.status === 'completed' && (
+                    <span className="ml-auto text-[10px] text-slate-400 font-normal">完成</span>
+                  )}
+                </div>
+
+                {isExpanded && (
+                  <div className="mt-1.5 ml-6 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono space-y-2 select-text">
+                    <div>
+                      <div className="text-[10px] font-sans font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                        参数 (Arguments)
+                      </div>
+                      <pre className="bg-white p-2 rounded border border-slate-200 text-[11px] text-slate-800 overflow-x-auto max-h-48 leading-relaxed whitespace-pre-wrap">
+                        {JSON.stringify(tool.args, null, 2)}
+                      </pre>
+                    </div>
+
+                    <div>
+                      <div className="text-[10px] font-sans font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                        输出结果 (Result)
+                      </div>
+                      {tool.status === 'running' ? (
+                        <div className="text-[11px] text-slate-400 italic">正在等待工具返回结果...</div>
+                      ) : (
+                        <pre className="bg-white p-2 rounded border border-slate-200 text-[11px] text-slate-800 overflow-x-auto max-h-60 leading-relaxed whitespace-pre-wrap">
+                          {typeof tool.result === 'string'
+                            ? tool.result
+                            : JSON.stringify(tool.result, null, 2) || '(无输出)'}
+                        </pre>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          }
+
+          if (item.kind === 'text' && item.content) {
+            return (
+              <div key={item.id} className="py-2.5 my-1 text-slate-900">
+                <MarkdownView content={item.content} />
+                {/* Red Box 4: Message Actions Toolbar */}
+                <MessageActionToolbar content={item.content} />
+              </div>
+            )
+          }
+
+          return null
+        })
+      )}
       <div ref={streamEndRef} />
     </div>
   )

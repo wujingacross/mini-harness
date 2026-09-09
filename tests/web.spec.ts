@@ -196,4 +196,40 @@ describe('Milestone 7: Web UI Server & Dashboard', () => {
     expect(events.some((e) => e.type === 'tool/result' && e.data.content.includes('live-test'))).toBe(true)
     expect(events.some((e) => e.type === 'turn/end')).toBe(true)
   })
+
+  it('supports deleting sessions and dynamic model switching in prompt', async () => {
+    const { ctx, serverUrl } = await startTestServer()
+
+    // 1. Create Session
+    const createRes = await fetch(`${serverUrl}/api/sessions`, { method: 'POST' })
+    const { sessionId } = await createRes.json()
+
+    // 2. Send prompt with custom model
+    const promptRes = await fetch(`${serverUrl}/api/sessions/${sessionId}/prompt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: 'echo test-model', model: 'deepseek-chat' }),
+    })
+    expect(promptRes.status).toBe(200)
+    const promptData = await promptRes.json()
+    expect(promptData.model).toBe('deepseek-chat')
+
+    const agent = ctx.webServer['activeAgents'].get(sessionId)
+    expect((agent as any).options.model).toBe('deepseek-chat')
+    await agent?.whenIdle()
+
+    // 3. Delete Session
+    const deleteRes = await fetch(`${serverUrl}/api/sessions/${sessionId}`, {
+      method: 'DELETE',
+    })
+    expect(deleteRes.status).toBe(200)
+    const deleteData = await deleteRes.json()
+    expect(deleteData.status).toBe('deleted')
+    expect(deleteData.sessionId).toBe(sessionId)
+
+    // Verify session is deleted
+    const getRes = await fetch(`${serverUrl}/api/sessions/${sessionId}`)
+    expect(getRes.status).toBe(404)
+    expect(ctx.webServer['activeAgents'].has(sessionId)).toBe(false)
+  })
 })

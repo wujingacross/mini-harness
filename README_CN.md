@@ -165,6 +165,12 @@ pnpm run demo:coding
 - [x] **Milestone 4**: 现代化 IDE 接入（基于 JSON-RPC 的 ACP - Agent Client Protocol，对接 Zed 编辑器）
 - [x] **Milestone 5**: 系统韧性与高级控制（Invariants 不变量契约校验、中途打断 Steering、优雅取消 Cancellation）
 - [x] **Milestone 6 (v1.1.0)**: 专业代码编辑与检索工具链（`view_file` 切片、`replace_file_content` 精准替换、`find_by_name`、`grep_search`）
+- [x] **Milestone 7 (v1.2.0)**: 100% 对齐官方的 React 19 Web 控制台（轨迹流渲染、工具卡片折叠展开、实时遥测底栏、动态模型切换、一体化侧边栏）
+- [ ] **Milestone 8**: 上下文自动压缩与截断管理（`@deepseek-ai/dsh-compaction`）
+- [ ] **Milestone 9**: 任务规划与结构化待办管理（`@deepseek-ai/dsh-plan` / `dsh-todo`）
+- [ ] **Milestone 10**: 人机协同与敏感操作干预授权（`@deepseek-ai/dsh-interaction`）
+- [ ] **Milestone 11**: 动态技能系统与渐进式扩展加载（`@deepseek-ai/dsh-skill`）
+- [ ] **Milestone 12**: 多智能体协同委派架构（`@deepseek-ai/dsh-subagent`）
 
 ---
 
@@ -177,6 +183,8 @@ pnpm run demo:coding
 * 📖 [Milestone 4 现代化 IDE 接入与 ACP 协议网关指南](docs/04-milestone4-acp-ide-integration.md)
 * 📖 [Milestone 5 系统韧性、Invariants 不变量与高级控制指南](docs/05-milestone5-resilience-and-hardening.md)
 * 📖 [Milestone 6 专业代码读写与检索工具链指南](docs/06-milestone6-code-editing-and-search-tools.md)
+* 📖 [Milestone 7 React 19 Web 控制台与轨迹流实战指南](docs/07-milestone7-web-ui-interaction.md)
+* 🧭 [Milestones 8 ~ 12 核心架构演进路线图](docs/08-future-milestones-roadmap.md)
 
 ---
 

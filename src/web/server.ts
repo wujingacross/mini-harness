@@ -111,23 +111,26 @@ export class WebServer extends Service {
     }
   }
 
-  private getOrCreateAgent(sessionId: string): Agent {
+  private getOrCreateAgent(sessionId: string, model?: string): Agent {
     let agent = this.activeAgents.get(sessionId)
+    const effectiveModel = model || this.defaultModel
     if (!agent) {
       const existingSession = this.ctx.sessions.get(sessionId)
       if (existingSession) {
         agent = new ReactLoopAgent(this.ctx, `agent-${sessionId}`, existingSession, {
-          model: this.defaultModel,
+          model: effectiveModel,
           systemPrompt: this.defaultSystemPrompt,
         })
         this.ctx.agents.register(agent)
       } else {
         agent = this.ctx.agentLoop.createAgent(sessionId, {
-          model: this.defaultModel,
+          model: effectiveModel,
           systemPrompt: this.defaultSystemPrompt,
         })
       }
       this.activeAgents.set(sessionId, agent)
+    } else if (model && (agent as any).options) {
+      ;(agent as any).options.model = model
     }
     return agent
   }
@@ -317,6 +320,20 @@ export class WebServer extends Service {
       return
     }
 
+    // DELETE /api/sessions/:id - Delete Session
+    if (sessionMatch && method === 'DELETE') {
+      const sessionId = sessionMatch[1]!
+      this.ctx.sessions.delete(sessionId)
+      this.activeAgents.delete(sessionId)
+      const persistence = this.ctx.get('sessionPersistence') as any
+      if (persistence && typeof persistence.delete === 'function') {
+        await persistence.delete(sessionId)
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ status: 'deleted', sessionId }))
+      return
+    }
+
     // GET /api/sessions/:id/events - SSE Stream
     const eventsMatch = pathname.match(/^\/api\/sessions\/([^/]+)\/events$/)
     if (eventsMatch && method === 'GET') {
@@ -346,6 +363,7 @@ export class WebServer extends Service {
       const sessionId = promptMatch[1]!
       const body = await this.parseJsonBody(req)
       const prompt = body.prompt
+      const model = body.model
 
       if (!prompt) {
         res.writeHead(400, { 'Content-Type': 'application/json' })
@@ -353,11 +371,11 @@ export class WebServer extends Service {
         return
       }
 
-      const agent = this.getOrCreateAgent(sessionId)
+      const agent = this.getOrCreateAgent(sessionId, model)
       agent.send(prompt)
 
       res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ status: 'accepted', sessionId }))
+      res.end(JSON.stringify({ status: 'accepted', sessionId, model }))
       return
     }
 

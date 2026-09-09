@@ -2,16 +2,16 @@ import React, { useState } from 'react'
 import { useSession } from '../context/SessionContext'
 
 export const FloatingInputArea: React.FC = () => {
-  const { sendPrompt, cancel, steer, isRunning, turnCount, stepCount } = useSession()
+  const { sendPrompt, cancel, steer, isRunning, telemetry } = useSession()
   const [text, setText] = useState('')
-  const [selectedModel, setSelectedModel] = useState('选择模型')
+  const [selectedModel, setSelectedModel] = useState('deepseek-chat')
   const [showModelDropdown, setShowModelDropdown] = useState(false)
 
   const handleSubmit = () => {
     const trimmed = text.trim()
     if (!trimmed || isRunning) return
     setText('')
-    sendPrompt(trimmed)
+    sendPrompt(trimmed, selectedModel)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -62,7 +62,7 @@ export const FloatingInputArea: React.FC = () => {
           <div className="flex items-center space-x-2.5 relative">
             <div
               onClick={() => setShowModelDropdown((prev) => !prev)}
-              className="px-2 py-1 rounded-md hover:bg-slate-100 text-slate-600 flex items-center gap-1 cursor-pointer text-[11px] font-medium"
+              className="px-2 py-1 rounded-md hover:bg-slate-100 text-slate-600 flex items-center gap-1 cursor-pointer text-[11px] font-medium border border-slate-200"
             >
               <span>{selectedModel}</span>
               <i className="fa-solid fa-chevron-down text-[8px] text-slate-400"></i>
@@ -70,7 +70,7 @@ export const FloatingInputArea: React.FC = () => {
 
             {/* Model Dropdown Popup */}
             {showModelDropdown && (
-              <div className="absolute right-20 bottom-8 w-36 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-30 text-xs">
+              <div className="absolute right-20 bottom-8 w-40 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-30 text-xs">
                 {['deepseek-chat', 'deepseek-reasoner'].map((m) => (
                   <div
                     key={m}
@@ -78,9 +78,12 @@ export const FloatingInputArea: React.FC = () => {
                       setSelectedModel(m)
                       setShowModelDropdown(false)
                     }}
-                    className="px-3 py-1.5 hover:bg-slate-100 cursor-pointer text-slate-700 font-mono text-[11px]"
+                    className={`px-3 py-1.5 hover:bg-slate-100 cursor-pointer font-mono text-[11px] flex items-center justify-between ${
+                      selectedModel === m ? 'text-blue-600 font-semibold bg-blue-50/50' : 'text-slate-700'
+                    }`}
                   >
-                    {m}
+                    <span>{m}</span>
+                    {selectedModel === m && <i className="fa-solid fa-check text-[10px]"></i>}
                   </div>
                 ))}
               </div>
@@ -115,14 +118,14 @@ export const FloatingInputArea: React.FC = () => {
       </div>
 
       {/* Telemetry Runtime Stats Footer */}
-      <div className="text-center text-[10px] text-slate-400 pt-2 font-mono select-none tracking-tight">
-        <span>{turnCount} 轮 · {stepCount} 步</span>
-        <span className="mx-1 text-slate-300">|</span>
-        <span>LLM 实时调度</span>
-        <span className="mx-1 text-slate-300">|</span>
+      <div className="text-center text-[10px] text-slate-400 pt-2 font-mono select-none tracking-tight flex items-center justify-center gap-1.5 flex-wrap">
+        <span>{telemetry.turns} 轮 · {telemetry.steps} 步</span>
+        <span className="text-slate-300">|</span>
+        <span>工具调用 {telemetry.toolCalls} 次</span>
+        <span className="text-slate-300">|</span>
+        <span>输入 {telemetry.inputTokens.toLocaleString()} · 输出 {telemetry.outputTokens.toLocaleString()} tokens</span>
+        <span className="text-slate-300">|</span>
         <span>首 token &lt; 1s</span>
-        <span className="mx-1 text-slate-300">|</span>
-        <span>上下文缓存活跃</span>
       </div>
     </div>
   )

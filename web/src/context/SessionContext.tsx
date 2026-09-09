@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react'
 
 export interface SessionHeader {
   id: string
@@ -12,6 +12,14 @@ export interface SessionEvent {
   data: any
 }
 
+export interface TelemetryStats {
+  turns: number
+  steps: number
+  toolCalls: number
+  inputTokens: number
+  outputTokens: number
+}
+
 interface SessionContextType {
   sessions: SessionHeader[]
   currentSessionId: string | null
@@ -19,11 +27,13 @@ interface SessionContextType {
   isRunning: boolean
   turnCount: number
   stepCount: number
+  telemetry: TelemetryStats
   activeTab: 'chat' | 'trajectory'
   setActiveTab: (tab: 'chat' | 'trajectory') => void
   switchSession: (sessionId: string) => Promise<void>
   createSession: () => Promise<void>
-  sendPrompt: (text: string) => Promise<void>
+  deleteSession: (sessionId: string) => Promise<void>
+  sendPrompt: (text: string, model?: string) => Promise<void>
   cancel: () => Promise<void>
   steer: (message: string) => Promise<void>
   exportSessionLog: () => void
@@ -147,51 +157,100 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [loadSessions, switchSession])
 
-  const sendPrompt = useCallback(async (text: string) => {
-    let targetSessionId = currentSessionId
-    if (!targetSessionId) {
-      const res = await fetch('/api/sessions', { method: 'POST' })
-      const data = await res.json()
-      targetSessionId = data.sessionId
-      setCurrentSessionId(targetSessionId)
-      await loadSessions()
+  const telemetry = useMemo<TelemetryStats>(() => {
+    let turns = 0
+    let steps = 0
+    let toolCalls = 0
+    let inputTokens = 0
+    let outputTokens = 0
+
+    for (const evt of events) {
+      if (evt.type === 'turn/start') turns++
+      else if (evt.type === 'step/start') steps++
+      else if (evt.type === 'tool/call') toolCalls++
+      else if (evt.type === 'assistant/message' && evt.data?.usage) {
+        inputTokens += evt.data.usage.promptTokens || 0
+        outputTokens += evt.data.usage.completionTokens || 0
+      }
     }
 
-    if (!targetSessionId) return
-
-    // 1. Optimistically append user message so it appears immediately in the main conversation area!
-    const userEvent: SessionEvent = {
-      type: 'user/message',
-      data: { content: [{ type: 'text', text }], source: 'user' },
+    return {
+      turns: Math.max(turns, turnCount),
+      steps: Math.max(steps, stepCount),
+      toolCalls,
+      inputTokens,
+      outputTokens,
     }
-    setEvents((prev) => [...prev, userEvent])
+  }, [events, turnCount, stepCount])
 
-    // 2. Optimistically update session title in sidebar and header if it was '新会话'
-    setSessions((prev) =>
-      prev.map((s) =>
-        s.id === targetSessionId && (!s.title || s.title === '新会话')
-          ? { ...s, title: text.slice(0, 32) }
-          : s
+  const deleteSession = useCallback(
+    async (sessionId: string) => {
+      try {
+        await fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' })
+        setSessions((prev) => prev.filter((s) => s.id !== sessionId))
+        if (currentSessionId === sessionId) {
+          const remaining = sessions.filter((s) => s.id !== sessionId)
+          if (remaining.length > 0) {
+            switchSession(remaining[0].id)
+          } else {
+            createSession()
+          }
+        }
+      } catch (err) {
+        console.error('Failed to delete session:', err)
+      }
+    },
+    [currentSessionId, sessions, switchSession, createSession],
+  )
+
+  const sendPrompt = useCallback(
+    async (text: string, model?: string) => {
+      let targetSessionId = currentSessionId
+      if (!targetSessionId) {
+        const res = await fetch('/api/sessions', { method: 'POST' })
+        const data = await res.json()
+        targetSessionId = data.sessionId
+        setCurrentSessionId(targetSessionId)
+        await loadSessions()
+      }
+
+      if (!targetSessionId) return
+
+      // 1. Optimistically append user message so it appears immediately in the main conversation area!
+      const userEvent: SessionEvent = {
+        type: 'user/message',
+        data: { content: [{ type: 'text', text }], source: 'user' },
+      }
+      setEvents((prev) => [...prev, userEvent])
+
+      // 2. Optimistically update session title in sidebar and header if it was '新会话'
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === targetSessionId && (!s.title || s.title === '新会话')
+            ? { ...s, title: text.slice(0, 32) }
+            : s,
+        ),
       )
-    )
 
-    // 3. Ensure SSE connection is active without closing/restarting
-    if (!eventSourceRef.current) {
-      connectSSE(targetSessionId)
-    }
+      // 3. Ensure SSE connection is active without closing/restarting
+      if (!eventSourceRef.current) {
+        connectSSE(targetSessionId)
+      }
 
-    setIsRunning(true)
-    try {
-      await fetch(`/api/sessions/${targetSessionId}/prompt`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: text }),
-      })
-    } catch (err) {
-      console.error('Failed to send prompt:', err)
-      setIsRunning(false)
-    }
-  }, [currentSessionId, connectSSE, loadSessions])
+      setIsRunning(true)
+      try {
+        await fetch(`/api/sessions/${targetSessionId}/prompt`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: text, model }),
+        })
+      } catch (err) {
+        console.error('Failed to send prompt:', err)
+        setIsRunning(false)
+      }
+    },
+    [currentSessionId, connectSSE, loadSessions],
+  )
 
   const cancel = useCallback(async () => {
     if (!currentSessionId) return
@@ -254,10 +313,12 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         isRunning,
         turnCount,
         stepCount,
+        telemetry,
         activeTab,
         setActiveTab,
         switchSession,
         createSession,
+        deleteSession,
         sendPrompt,
         cancel,
         steer,

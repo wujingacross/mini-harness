@@ -147,4 +147,16 @@ export class JsonlSessionPersistence extends SessionPersistence {
 
     return results.sort((a, b) => b.createdAt - a.createdAt)
   }
+
+  async delete(sessionId: string): Promise<boolean> {
+    await this.ensureStorageDir()
+    const filePath = this.getFilePath(sessionId)
+    try {
+      await fs.unlink(filePath)
+      this.sessionHeaders.delete(sessionId)
+      return true
+    } catch {
+      return false
+    }
+  }
 }

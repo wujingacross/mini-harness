@@ -139,6 +139,10 @@ export class SessionStore extends Service {
     return this.store.get(id)
   }
 
+  delete(id: string): boolean {
+    return this.store.delete(id)
+  }
+
   list(): string[] {
     return Array.from(this.store.keys())
   }
