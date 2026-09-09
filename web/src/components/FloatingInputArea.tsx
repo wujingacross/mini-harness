@@ -1,28 +1,58 @@
 import React, { useState, useEffect } from 'react'
-import { useSession } from '../context/SessionContext'
+import { useSession, STORAGE_KEY_SELECTED_MODEL, STORAGE_KEY_CUSTOM_MODELS } from '../context/SessionContext'
+
+const DEFAULT_MODELS = [
+  'deepseek-chat',
+  'deepseek-reasoner',
+  'glm-4-flash',
+  'qwen-plus',
+]
 
 export const FloatingInputArea: React.FC = () => {
-  const { sendPrompt, cancel, steer, isRunning, telemetry } = useSession()
+  const { sendPrompt, cancel, steer, isRunning, telemetry, selectedModel, setSelectedModel } = useSession()
   const [text, setText] = useState('')
-  const [selectedModel, setSelectedModel] = useState('deepseek-chat')
   const [showModelDropdown, setShowModelDropdown] = useState(false)
-  const [availableModels, setAvailableModels] = useState<string[]>([
-    'deepseek-chat',
-    'deepseek-reasoner',
-    'glm-4-flash',
-    'qwen-plus',
-  ])
+  const [availableModels, setAvailableModels] = useState<string[]>(() => {
+    const list = [...DEFAULT_MODELS]
+    if (typeof window !== 'undefined') {
+      try {
+        const savedCustom = localStorage.getItem(STORAGE_KEY_CUSTOM_MODELS)
+        if (savedCustom) {
+          const parsed = JSON.parse(savedCustom)
+          if (Array.isArray(parsed)) {
+            for (const m of parsed) {
+              if (typeof m === 'string' && m.trim() && !list.includes(m.trim())) {
+                list.unshift(m.trim())
+              }
+            }
+          }
+        }
+        const savedSelected = localStorage.getItem(STORAGE_KEY_SELECTED_MODEL)
+        if (savedSelected && savedSelected.trim() && !list.includes(savedSelected.trim())) {
+          list.unshift(savedSelected.trim())
+        }
+      } catch {
+        // ignore parse error
+      }
+    }
+    return Array.from(new Set(list))
+  })
 
   useEffect(() => {
     fetch('/api/models')
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data?.models) && data.models.length > 0) {
-          setAvailableModels((prev) => Array.from(new Set([...data.models, ...prev])))
+          setAvailableModels((prev) => Array.from(new Set([...prev, ...data.models])))
+        }
+        if (typeof window !== 'undefined' && !localStorage.getItem(STORAGE_KEY_SELECTED_MODEL)) {
+          if (data?.defaultModel) {
+            setSelectedModel(data.defaultModel)
+          }
         }
       })
       .catch(() => {})
-  }, [])
+  }, [setSelectedModel])
 
   const handleSubmit = () => {
     const trimmed = text.trim()
@@ -45,6 +75,11 @@ export const FloatingInputArea: React.FC = () => {
     }
   }
 
+  const handleSelectModel = (m: string) => {
+    setSelectedModel(m)
+    setShowModelDropdown(false)
+  }
+
   const handleAddCustomModel = () => {
     const custom = window.prompt('输入自定义模型标识 (如 glm-4-flash, qwen-plus, gpt-4o 等):')
     if (custom?.trim()) {
@@ -52,6 +87,16 @@ export const FloatingInputArea: React.FC = () => {
       setAvailableModels((prev) => [modelName, ...prev.filter((m) => m !== modelName)])
       setSelectedModel(modelName)
       setShowModelDropdown(false)
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY_CUSTOM_MODELS)
+          const list: string[] = raw ? JSON.parse(raw) : []
+          const nextList = [modelName, ...(Array.isArray(list) ? list.filter((m) => m !== modelName) : [])]
+          localStorage.setItem(STORAGE_KEY_CUSTOM_MODELS, JSON.stringify(nextList))
+        } catch {
+          localStorage.setItem(STORAGE_KEY_CUSTOM_MODELS, JSON.stringify([modelName]))
+        }
+      }
     }
   }
 
@@ -116,15 +161,18 @@ export const FloatingInputArea: React.FC = () => {
                   } else if (m.includes('gpt') || m.includes('o1')) {
                     badge = 'OpenAI'
                     badgeColor = 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                  } else if (m.includes('ollama') || m.includes('llama') || m.includes('mistral')) {
+                    badge = '本地/Ollama'
+                    badgeColor = 'bg-orange-50 text-orange-700 border border-orange-100'
+                  } else if (m.includes('claude')) {
+                    badge = 'Anthropic'
+                    badgeColor = 'bg-rose-50 text-rose-700 border border-rose-100'
                   }
 
                   return (
                     <div
                       key={m}
-                      onClick={() => {
-                        setSelectedModel(m)
-                        setShowModelDropdown(false)
-                      }}
+                      onClick={() => handleSelectModel(m)}
                       className={`px-3 py-1.5 hover:bg-slate-100 cursor-pointer text-[11px] flex items-center justify-between transition ${
                         selectedModel === m ? 'text-blue-600 font-semibold bg-blue-50/50' : 'text-slate-700'
                       }`}

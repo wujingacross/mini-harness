@@ -20,6 +20,9 @@ export interface TelemetryStats {
   outputTokens: number
 }
 
+export const STORAGE_KEY_SELECTED_MODEL = 'mini_harness_selected_model'
+export const STORAGE_KEY_CUSTOM_MODELS = 'mini_harness_custom_models'
+
 interface SessionContextType {
   sessions: SessionHeader[]
   currentSessionId: string | null
@@ -37,6 +40,8 @@ interface SessionContextType {
   cancel: () => Promise<void>
   steer: (message: string) => Promise<void>
   exportSessionLog: () => void
+  selectedModel: string
+  setSelectedModel: (model: string) => void
 }
 
 const SessionContext = createContext<SessionContextType | null>(null)
@@ -49,6 +54,20 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [turnCount, setTurnCount] = useState(0)
   const [stepCount, setStepCount] = useState(0)
   const [activeTab, setActiveTab] = useState<'chat' | 'trajectory'>('chat')
+  const [selectedModel, setSelectedModelState] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(STORAGE_KEY_SELECTED_MODEL)
+      if (saved && saved.trim()) return saved.trim()
+    }
+    return 'deepseek-chat'
+  })
+
+  const setSelectedModel = useCallback((model: string) => {
+    setSelectedModelState(model)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY_SELECTED_MODEL, model)
+    }
+  }, [])
 
   const eventSourceRef = useRef<EventSource | null>(null)
 
@@ -242,18 +261,19 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
 
       setIsRunning(true)
+      const effectiveModel = model || selectedModel
       try {
         await fetch(`/api/sessions/${targetSessionId}/prompt`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: text, model }),
+          body: JSON.stringify({ prompt: text, model: effectiveModel }),
         })
       } catch (err) {
         console.error('Failed to send prompt:', err)
         setIsRunning(false)
       }
     },
-    [currentSessionId, connectSSE, loadSessions],
+    [currentSessionId, connectSSE, loadSessions, selectedModel],
   )
 
   const cancel = useCallback(async () => {
@@ -327,6 +347,8 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         cancel,
         steer,
         exportSessionLog,
+        selectedModel,
+        setSelectedModel,
       }}
     >
       {children}
