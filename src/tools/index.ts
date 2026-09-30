@@ -1,5 +1,6 @@
 import { Context, Service } from 'cordis'
 import type { ToolSchema } from '../system-prompt/index.js'
+import type { Session } from '../session/index.js'
 
 export * from './bash.js'
 export * from './file.js'
@@ -13,13 +14,14 @@ export interface ToolDefinition<TArgs = any> {
     properties: Record<string, unknown>
     required?: string[]
   }
-  execute(args: TArgs): Promise<string> | string
+  execute(args: TArgs, exec?: ToolExecution): Promise<string> | string
 }
 
 export interface ToolExecution {
   callId: string
   name: string
   arguments: Record<string, unknown>
+  session?: Session
 }
 
 export interface ToolExecutionResult {
@@ -81,7 +83,7 @@ export class ToolRegistry extends Service {
 
     const defaultRunner = async (): Promise<ToolExecutionResult> => {
       try {
-        const res = await tool.execute(exec.arguments)
+        const res = await tool.execute(exec.arguments, exec)
         return { content: res, isError: false }
       } catch (err: any) {
         return { content: err?.message || String(err), isError: true }

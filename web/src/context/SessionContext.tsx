@@ -25,6 +25,17 @@ export interface TelemetryStats {
 export const STORAGE_KEY_SELECTED_MODEL = 'mini_harness_selected_model'
 export const STORAGE_KEY_CUSTOM_MODELS = 'mini_harness_custom_models'
 
+export interface TodoItem {
+  id?: string
+  content: string
+  status: 'pending' | 'in_progress' | 'completed'
+}
+
+export interface PlanState {
+  active: boolean
+  pending: boolean
+}
+
 interface SessionContextType {
   sessions: SessionHeader[]
   currentSessionId: string | null
@@ -33,6 +44,8 @@ interface SessionContextType {
   turnCount: number
   stepCount: number
   telemetry: TelemetryStats
+  planState: PlanState
+  todos: TodoItem[]
   activeTab: 'chat' | 'trajectory'
   setActiveTab: (tab: 'chat' | 'trajectory') => void
   switchSession: (sessionId: string) => Promise<void>
@@ -41,6 +54,8 @@ interface SessionContextType {
   sendPrompt: (text: string, model?: string) => Promise<void>
   cancel: () => Promise<void>
   steer: (message: string) => Promise<void>
+  togglePlanMode: (active: boolean) => Promise<void>
+  approvePlan: () => Promise<void>
   exportSessionLog: () => void
   selectedModel: string
   setSelectedModel: (model: string) => void
@@ -300,6 +315,51 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [currentSessionId])
 
+  const planState = useMemo<PlanState>(() => {
+    for (let i = events.length - 1; i >= 0; i--) {
+      if (events[i].type === 'plan/mode') {
+        return { active: Boolean(events[i].data?.active), pending: false }
+      }
+    }
+    return { active: false, pending: false }
+  }, [events])
+
+  const todos = useMemo<TodoItem[]>(() => {
+    for (let i = events.length - 1; i >= 0; i--) {
+      if (events[i].type === 'todo/write') {
+        return events[i].data?.todos || []
+      }
+    }
+    return []
+  }, [events])
+
+  const togglePlanMode = useCallback(
+    async (active: boolean) => {
+      if (!currentSessionId) return
+      try {
+        await fetch(`/api/sessions/${currentSessionId}/plan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ active }),
+        })
+      } catch (err) {
+        console.error('Failed to toggle plan mode:', err)
+      }
+    },
+    [currentSessionId],
+  )
+
+  const approvePlan = useCallback(async () => {
+    if (!currentSessionId) return
+    try {
+      await fetch(`/api/sessions/${currentSessionId}/plan/approve`, {
+        method: 'POST',
+      })
+    } catch (err) {
+      console.error('Failed to approve plan:', err)
+    }
+  }, [currentSessionId])
+
   const exportSessionLog = useCallback(() => {
     if (!currentSessionId) return
     const blob = new Blob([JSON.stringify(events, null, 2)], { type: 'application/json' })
@@ -340,6 +400,8 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         turnCount,
         stepCount,
         telemetry,
+        planState,
+        todos,
         activeTab,
         setActiveTab,
         switchSession,
@@ -348,6 +410,8 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         sendPrompt,
         cancel,
         steer,
+        togglePlanMode,
+        approvePlan,
         exportSessionLog,
         selectedModel,
         setSelectedModel,

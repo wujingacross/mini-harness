@@ -14,7 +14,7 @@ export interface ToolSchema {
 export interface PromptSection {
   name: string
   order: number
-  text: string | (() => string)
+  text: string | ((session?: Session) => string)
 }
 
 export interface PromptAssembly {
@@ -34,10 +34,10 @@ declare module 'cordis' {
 }
 
 /** 拼接所有段落文本，若段落为函数则惰性求值 */
-export function renderPrompt(assembly: PromptAssembly): string {
+export function renderPrompt(assembly: PromptAssembly, session?: Session): string {
   return assembly.sections
-    .map(s => typeof s.text === 'function' ? s.text() : s.text)
-    .filter(t => t.trim().length > 0)
+    .map(s => typeof s.text === 'function' ? s.text(session) : s.text)
+    .filter(t => Boolean(t && t.trim().length > 0))
     .join('\n\n')
 }
 

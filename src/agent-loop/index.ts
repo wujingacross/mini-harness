@@ -6,6 +6,7 @@ import { BlockAssembler } from '../types/stream.js'
 import { renderPrompt } from '../system-prompt/index.js'
 import type { SessionPersistence } from '../session-persistence/index.js'
 import type { CompactionEngine } from '../compaction/index.js'
+import type { PlanModeController } from '../plan/index.js'
 
 declare module 'cordis' {
   interface Context {
@@ -26,6 +27,10 @@ export class ReactLoopAgent implements Agent {
 
   private get compaction(): CompactionEngine | undefined {
     return this.ctx.get('compaction') as CompactionEngine | undefined
+  }
+
+  private get planMode(): PlanModeController | undefined {
+    return this.ctx.get('planMode') as PlanModeController | undefined
   }
 
   constructor(
@@ -54,6 +59,57 @@ export class ReactLoopAgent implements Agent {
     if (blocks.length === 1 && blocks[0].type === 'text' && blocks[0].text.trim() === '/compact') {
       void this.executeManualCompaction()
       return
+    }
+
+    // 拦截 /plan 相关控制命令
+    if (blocks.length === 1 && blocks[0].type === 'text') {
+      const text = blocks[0].text.trim()
+      if (text === '/plan off') {
+        const planMode = this.planMode
+        if (planMode) {
+          const outcome = planMode.set(this.session, false, 'plan_off')
+          const msg = outcome === 'committed'
+            ? 'Plan mode off.'
+            : 'Leaving plan mode (applies from the next step).'
+          this.session.append('context/message', {
+            content: [{ type: 'text', text: msg }],
+            source: 'system',
+          })
+          this.ctx.emit('session/event', this.session, this.session.events[this.session.events.length - 1])
+        }
+        return
+      }
+
+      if (text === '/plan') {
+        const planMode = this.planMode
+        if (planMode) {
+          const outcome = planMode.set(this.session, true, 'user_command')
+          const msg = outcome === 'committed'
+            ? 'Plan mode on. Use /plan off to leave.'
+            : 'Entering plan mode (applies from the next step). Use /plan off to leave.'
+          this.session.append('context/message', {
+            content: [{ type: 'text', text: msg }],
+            source: 'system',
+          })
+          this.ctx.emit('session/event', this.session, this.session.events[this.session.events.length - 1])
+        }
+        return
+      }
+
+      if (text.startsWith('/plan ')) {
+        const planMode = this.planMode
+        const instruction = text.slice(6).trim()
+        if (planMode) {
+          planMode.set(this.session, true, 'user_command')
+        }
+        if (instruction) {
+          this.inbox.push([{ type: 'text', text: instruction }])
+          if (this.status === 'idle') {
+            void this.drainInbox()
+          }
+        }
+        return
+      }
     }
 
     this.inbox.push(blocks)
@@ -128,6 +184,26 @@ export class ReactLoopAgent implements Agent {
       typeof content === 'string' ? [{ type: 'text', text: content }] : content
 
     if (this.status === 'running') {
+      if (blocks.length === 1 && blocks[0].type === 'text') {
+        const text = blocks[0].text.trim()
+        if (text === '/plan off') {
+          this.planMode?.set(this.session, false, 'plan_off')
+          return
+        }
+        if (text === '/plan') {
+          this.planMode?.set(this.session, true, 'user_command')
+          return
+        }
+        if (text.startsWith('/plan ')) {
+          this.planMode?.set(this.session, true, 'user_command')
+          const instruction = text.slice(6).trim()
+          if (instruction) {
+            this.steer([{ type: 'text', text: instruction }])
+          }
+          return
+        }
+      }
+
       this.session.append('steering/message', {
         turn: this.turnCounter,
         content: blocks,
@@ -227,7 +303,7 @@ export class ReactLoopAgent implements Agent {
 
       // 1. 装配提示词
       const assembly = await this.ctx.systemPrompt.assemble(this.session)
-      const systemText = [renderPrompt(assembly), this.options.systemPrompt].filter(Boolean).join('\n\n')
+      const systemText = [renderPrompt(assembly, this.session), this.options.systemPrompt].filter(Boolean).join('\n\n')
 
       // 2. 从事件流派生当前消息历史 (deriveMessages 纯函数投影，自动包含 steering 并过滤已压缩历史)
       const messages = this.session.deriveMessages()
@@ -311,6 +387,7 @@ export class ReactLoopAgent implements Agent {
           callId: call.id,
           name: call.name,
           arguments: call.arguments,
+          session: this.session,
         })
 
         this.session.append('tool/result', {
@@ -341,7 +418,7 @@ export class AgentLoop extends Service {
   }
 
   createAgent(id: string, options: AgentOptions = {}): Agent {
-    const session = this.ctx.sessions.create(id)
+    const session = this.ctx.sessions.get(id) || this.ctx.sessions.create(id)
     const agent = new ReactLoopAgent(this.ctx, id, session, options)
     this.ctx.agents.register(agent)
     return agent

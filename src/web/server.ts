@@ -5,6 +5,8 @@ import { Context, Service } from 'cordis'
 import type { Agent } from '../agent/index.js'
 import { ReactLoopAgent } from '../agent-loop/index.js'
 import type { SessionPersistenceService } from '../session-persistence/types.js'
+import { deriveTodos } from '../todo/index.js'
+import type { PlanModeController } from '../plan/index.js'
 
 export interface WebServerConfig {
   port?: number
@@ -273,12 +275,22 @@ export class WebServer extends Service {
           }
 
           const createdAt = ses?.header?.createdAt || headerMap.get(id)?.createdAt || 0
+          const planMode = this.ctx.get('planMode') as PlanModeController | undefined
+          const planState = ses && planMode ? planMode.getState(ses) : { active: false, pending: false }
+          const todos = ses ? deriveTodos(ses) : []
+          const todosCount = {
+            total: todos.length,
+            completed: todos.filter(t => t.status === 'completed').length,
+            inProgress: todos.filter(t => t.status === 'in_progress').length,
+          }
 
           return {
             id,
             title: title.slice(0, 32),
             createdAt,
             eventsCount: ses?.events.length || 0,
+            plan: planState,
+            todosCount,
           }
         })
       )
@@ -326,8 +338,12 @@ export class WebServer extends Service {
         return
       }
 
+      const planMode = this.ctx.get('planMode') as PlanModeController | undefined
+      const plan = planMode ? planMode.getState(session) : { active: false, pending: false }
+      const todos = deriveTodos(session)
+
       res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ sessionId: session.id, events: session.events }))
+      res.end(JSON.stringify({ sessionId: session.id, events: session.events, plan, todos }))
       return
     }
 
@@ -436,6 +452,52 @@ export class WebServer extends Service {
         res.writeHead(500, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ error: err?.message || String(err), sessionId }))
       }
+      return
+    }
+
+    // POST /api/sessions/:id/plan - Toggle Plan Mode
+    const planToggleMatch = pathname.match(/^\/api\/sessions\/([^/]+)\/plan$/)
+    if (planToggleMatch && method === 'POST') {
+      const sessionId = planToggleMatch[1]!
+      const session = this.ctx.sessions.get(sessionId)
+      if (!session) {
+        res.writeHead(404, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: `Session "${sessionId}" not found` }))
+        return
+      }
+      const body = await this.parseJsonBody(req)
+      const active = Boolean(body.active)
+      const planMode = this.ctx.get('planMode') as PlanModeController | undefined
+      if (!planMode) {
+        res.writeHead(400, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: 'PlanMode service is not loaded' }))
+        return
+      }
+      const outcome = planMode.set(session, active, active ? 'user_command' : 'plan_off')
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ status: outcome, plan: planMode.getState(session) }))
+      return
+    }
+
+    // POST /api/sessions/:id/plan/approve - Approve Plan and Exit Plan Mode
+    const planApproveMatch = pathname.match(/^\/api\/sessions\/([^/]+)\/plan\/approve$/)
+    if (planApproveMatch && method === 'POST') {
+      const sessionId = planApproveMatch[1]!
+      const session = this.ctx.sessions.get(sessionId)
+      if (!session) {
+        res.writeHead(404, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: `Session "${sessionId}" not found` }))
+        return
+      }
+      const planMode = this.ctx.get('planMode') as PlanModeController | undefined
+      if (!planMode) {
+        res.writeHead(400, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: 'PlanMode service is not loaded' }))
+        return
+      }
+      planMode.set(session, false, 'plan_approved')
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ status: 'approved', plan: planMode.getState(session) }))
       return
     }
 

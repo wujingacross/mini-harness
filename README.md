@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/wujingacross/mini-harness"><img src="https://img.shields.io/badge/GitHub-mini--harness-blue?logo=github" alt="GitHub"></a>
-  <a href="https://github.com/wujingacross/mini-harness/releases"><img src="https://img.shields.io/badge/Release-v1.3.0-green" alt="Release"></a>
+  <a href="https://github.com/wujingacross/mini-harness/releases"><img src="https://img.shields.io/badge/Release-v1.4.0-green" alt="Release"></a>
   <a href="https://github.com/wujingacross/mini-harness/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow" alt="License"></a>
   <a href="https://api.deepseek.com"><img src="https://img.shields.io/badge/LLM-DeepSeek--V3%20%7C%20DeepSeek--R1-4D6BFE" alt="DeepSeek"></a>
   <a href="https://zed.dev"><img src="https://img.shields.io/badge/Protocol-ACP%20(Zed%20Editor)-orange" alt="ACP"></a>
@@ -27,6 +27,8 @@ Mini Harness maps the multi-package complexity of official `@deepseek-ai/dsh-*` 
 | `@deepseek-ai/dsh-session` | [`src/session/`](src/session/) | Event-sourced session store, `deriveMessages` projection & repair |
 | `@deepseek-ai/dsh-session-persistence` | [`src/session-persistence/`](src/session-persistence/) | Write-Behind buffer with JSONL / SQLite backends |
 | `@deepseek-ai/dsh-compaction` | [`src/compaction/`](src/compaction/) | Context compaction seam, tool-pairing balance, transaction locks & `/compact` command |
+| `@deepseek-ai/dsh-plan-mode` | [`src/plan/`](src/plan/) | Plan mode state machine, `plan:policy` prompt guidance, `/plan` commands & `exit_plan_mode` review |
+| `@deepseek-ai/dsh-tool-todo` | [`src/todo/`](src/todo/) | Structured `todo_write` tool, whole-list replace, concurrency control & `deriveTodos` state projection |
 | `@deepseek-ai/dsh-tool-fs` / `tool-str-replace-editor` | [`src/tools/file.ts`](src/tools/file.ts) | `view_file` line slicing, `replace_file_content` surgical editing, `write_to_file` |
 | `@deepseek-ai/dsh-tool-fs-search` | [`src/tools/search.ts`](src/tools/search.ts) | `find_by_name` glob search, `grep_search` regex code search |
 | `@deepseek-ai/dsh-acp` | [`src/acp/`](src/acp/) | JSON-RPC 2.0 stdio gateway connecting **Zed** & ACP editors |
@@ -74,6 +76,12 @@ Mini Harness maps the multi-package complexity of official `@deepseek-ai/dsh-*` 
    - High-density trajectory stream with Markdown rendering, collapsible tool inspection cards, and token cost telemetry.
    - Interactive model switching (DeepSeek-V3 / DeepSeek-R1 / Mock LLM) and manual compaction actions.
 
+9. **Plan Mode & Structured Todo Tracking**:
+   - `planMode`: Logged collaboration state machine ensuring the model explores and designs before executing destructive changes.
+   - Dynamic prompt policy injection (`plan:policy`) and atomic step-boundary state transitions (`pendingIntents`).
+   - `exit_plan_mode`: Human-in-the-loop review workflow presenting Markdown plans for approval or iterative feedback.
+   - `todo_write`: Whole-list replacement tracking multi-step execution with single/parallel in-progress discipline.
+
 ---
 
 ## 📂 Project Structure
@@ -84,7 +92,9 @@ mini-harness/
 │   ├── types/               # Core vocabulary (ContentBlocks, StreamChunks, SessionEvents, SessionHeader)
 │   ├── session/             # Event-sourced session store & message projection (+ repair & compaction masking)
 │   ├── session-persistence/ # Session Persistence Seam (Write-Behind buffer + Checkpoints)
-│   ├── compaction/          # 【New】Context Compaction Seam (Engine, Tool Pairing Balance, Summarizer)
+│   ├── compaction/          # Context Compaction Seam (Engine, Tool Pairing Balance, Summarizer)
+│   ├── plan/                # 【New】Plan Mode Seam (Engine, Reviewed Exit Tool, Policy Prompt)
+│   ├── todo/                # 【New】Todo Tracking Seam (Whole-list Replacement Tool & State Derivation)
 │   ├── acp/                 # Agent Client Protocol (ACP) IDE Bridge
 │   ├── invariants/          # Runtime invariants guard & Deep Freeze immutability
 │   ├── system-prompt/       # Ordered section prompt assembly & tool schema providers
@@ -95,18 +105,18 @@ mini-harness/
 │   ├── bash/                # Bash Capability Seam (Interface + Local process group impl)
 │   ├── llm/                 # Model adapters (Mock LLM + Real DeepSeek SSE adapter)
 │   ├── agent/               # Agent registry & global lifecycle events (+ steer / cancel)
-│   ├── agent-loop/          # ReAct Loop state machine (+ resumeAgent & compaction triggers)
+│   ├── agent-loop/          # ReAct Loop state machine (+ resumeAgent & /plan command hooks)
 │   ├── web/                 # Web server (REST API + SSE Trajectory & Session streaming)
 │   ├── ui/                  # Interactive stdio CLI with ANSI streaming rendering
 │   └── demo/
 │       ├── echo.ts          # Milestone 1: Echo Agent Demo
 │       ├── coding.ts        # Milestone 2, 3 & 6: Real Coding Agent with Persistence, File & Search Tools
 │       ├── acp.ts           # Milestone 4 & 6: Production ACP Server for Zed / IDE with File & Search Tools
-│       └── web.ts           # Milestone 7 & 8: Full-stack Web Console Server
+│       └── web.ts           # Milestone 7, 8 & 9: Full-stack Web Console Server
 ├── web/                     # React 19 + Vite Frontend SPA Console
-│   ├── src/components/      # TrajectoryStream, SessionSidebar, ModelSelector, Collapsible Tool Cards
-│   └── src/context/         # SessionContext & SSE Real-time Subscription
-├── docs/                    # Architecture & implementation tutorials (Milestones 1-8)
+│   ├── src/components/      # TrajectoryStream, TodoList, SessionSidebar, ModelSelector, Tool Cards
+│   └── src/context/         # SessionContext & SSE Real-time Subscription (+ Plan & Todo State)
+├── docs/                    # Architecture & implementation tutorials (Milestones 1-9)
 │   ├── 01-milestone1-echo-agent.md
 │   ├── 02-milestone2-coding-agent.md
 │   ├── 03-milestone3-session-persistence.md
@@ -114,8 +124,9 @@ mini-harness/
 │   ├── 05-milestone5-resilience-and-hardening.md
 │   ├── 06-milestone6-code-editing-and-search-tools.md
 │   ├── 07-milestone7-web-ui-interaction.md
-│   └── 08-milestone8-compaction-guide.md
-├── tests/                   # Automated test suites (13 test suites, 43 tests passing)
+│   ├── 08-milestone8-compaction-guide.md
+│   └── 09-milestone9-plan-mode-and-todo-guide.md
+├── tests/                   # Automated test suites (14 test suites, 52 tests passing)
 │   ├── echo.spec.ts
 │   ├── bash.spec.ts
 │   ├── file-tools.spec.ts
@@ -128,7 +139,8 @@ mini-harness/
 │   ├── steering.spec.ts
 │   ├── cancellation.spec.ts
 │   ├── web-server.spec.ts
-│   └── compaction.spec.ts   # 【New】Compaction seam, tool-pairing balance & /compact command tests
+│   ├── compaction.spec.ts
+│   └── plan-and-todo.spec.ts # 【New】Plan mode, exit_plan_mode review & todo_write tests
 ├── package.json
 └── tsconfig.json
 ```
@@ -186,7 +198,7 @@ pnpm run demo:web
 - [x] **Milestone 6 (v1.1.0)**: Dedicated Code Editing & Discovery Tools (`view_file`, `replace_file_content`, `find_by_name`, `grep_search`)
 - [x] **Milestone 7 (v1.2.0)**: Modern React 19 Web Console (Trajectory Stream, Collapsible Tool Inspection, Real-time Telemetry, Dynamic Model Switch, Full-height Sidebar)
 - [x] **Milestone 8 (v1.3.0)**: Context Compaction & Token Management (Token pressure check, atomic 3-phase compaction lock, tool pairing balance, `/compact` manual trigger & Web visual summary)
-- [ ] **Milestone 9**: Plan Mode & Structured Todo Tracking (`@deepseek-ai/dsh-plan`, `@deepseek-ai/dsh-todo`)
+- [x] **Milestone 9 (v1.4.0)**: Plan Mode & Structured Todo Tracking (`/plan` command, `plan:policy` prompt injection, `exit_plan_mode` review, `todo_write` task checklist & Web console progress bar)
 - [ ] **Milestone 10**: Human-in-the-Loop Interaction & Sensitive Tool Approval (`@deepseek-ai/dsh-interaction`)
 - [ ] **Milestone 11**: Dynamic Skill System & Progressive Loading (`@deepseek-ai/dsh-skill`)
 - [ ] **Milestone 12**: Subagent & Multi-Agent Task Delegation (`@deepseek-ai/dsh-subagent`)
@@ -203,6 +215,7 @@ pnpm run demo:web
 * 📖 [Milestone 6 Code Editing & Search Toolchain Guide](docs/06-milestone6-code-editing-and-search-tools.md)
 * 📖 [Milestone 7 React 19 Web Console & Trajectory Stream Guide](docs/07-milestone7-web-ui-interaction.md)
 * 📖 [Milestone 8 Context Compaction & Token Management Guide](docs/08-milestone8-compaction-guide.md)
+* 📖 [Milestone 9 Plan Mode & Structured Todo Tracking Guide](docs/09-milestone9-plan-mode-and-todo-guide.md)
 * 🧭 [Milestones 8 ~ 12 Future Architectural Roadmap](docs/08-future-milestones-roadmap.md)
 
 ---

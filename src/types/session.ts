@@ -58,6 +58,12 @@ export interface SessionEventMap {
     model?: string
   }
   'compaction/end': { compactionId: string; turn: number | null; error?: string }
+
+  // 规划模式与协作状态 (Plan Mode)
+  'plan/mode': { active: boolean; reason?: 'user_command' | 'plan_approved' | 'plan_off' | 'initial' }
+
+  // 结构化任务待办列表 (Todo Tracking)
+  'todo/write': { todos: Array<{ id?: string; content: string; status: 'pending' | 'in_progress' | 'completed' }> }
 }
 
 export type SessionEventType = keyof SessionEventMap

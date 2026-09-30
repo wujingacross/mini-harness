@@ -339,6 +339,14 @@ export const TrajectoryStream: React.FC = () => {
               icon = 'fa-terminal'
               label = 'Bash'
               paramText = tool.args?.command || tool.args?.CommandLine || ''
+            } else if (tool.name === 'exit_plan_mode') {
+              icon = 'fa-clipboard-check'
+              label = 'Plan'
+              paramText = '提交方案并申请退出规划模式'
+            } else if (tool.name === 'todo_write') {
+              icon = 'fa-list-check'
+              label = 'Todo'
+              paramText = `更新待办任务清单 (${Array.isArray(tool.args?.todos) ? tool.args.todos.length : 0} 项)`
             }
 
             return (
