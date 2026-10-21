@@ -11,7 +11,7 @@ interface ToolCallItem {
 }
 
 interface TimelineItem {
-  kind: 'user' | 'think' | 'tool' | 'text' | 'error' | 'compaction'
+  kind: 'user' | 'think' | 'tool' | 'text' | 'error' | 'compaction' | 'system'
   id: string
   content?: string
   tool?: ToolCallItem
@@ -214,6 +214,20 @@ export const TrajectoryStream: React.FC = () => {
             summary: summaryText,
           },
         })
+      } else if (evt.type === 'context/message') {
+        flushStreamingThink()
+        flushStreamingText()
+        let sysText = ''
+        if (typeof evt.data?.content === 'string') {
+          sysText = evt.data.content
+        } else if (Array.isArray(evt.data?.content)) {
+          sysText = evt.data.content.map((c: any) => (typeof c === 'string' ? c : c.text || '')).join('\n')
+        } else if (evt.data?.content?.text) {
+          sysText = evt.data.content.text
+        }
+        if (sysText) {
+          list.push({ kind: 'system', id: `sys_${list.length}`, content: sysText })
+        }
       } else if (evt.type === 'turn/end' && evt.data?.reason?.kind === 'error') {
         flushStreamingThink()
         flushStreamingText()
@@ -236,7 +250,9 @@ export const TrajectoryStream: React.FC = () => {
 
   const visibleItems = useMemo(() => {
     if (activeTab === 'trajectory') {
-      return items.filter((it) => it.kind === 'think' || it.kind === 'tool' || it.kind === 'compaction')
+      return items.filter(
+        (it) => it.kind === 'think' || it.kind === 'tool' || it.kind === 'compaction' || it.kind === 'system',
+      )
     }
     return items
   }, [items, activeTab])
@@ -428,6 +444,24 @@ export const TrajectoryStream: React.FC = () => {
           }
 
           if (item.kind === 'error') {
+            const isCancelled = Boolean(item.content && /cancel|abort/i.test(item.content))
+            if (isCancelled) {
+              return (
+                <div
+                  key={item.id}
+                  className="my-3 p-3.5 rounded-xl border border-amber-200 bg-amber-50/80 text-amber-800 text-xs flex items-start gap-2.5 shadow-2xs select-text"
+                >
+                  <i className="fa-solid fa-circle-stop text-amber-600 text-sm shrink-0 mt-0.5"></i>
+                  <div className="flex-1 space-y-1">
+                    <div className="font-semibold text-[13px] text-amber-900">执行已中止 (用户主动停止)</div>
+                    <div className="text-[12px] font-mono leading-relaxed whitespace-pre-wrap text-amber-700">
+                      {item.content}
+                    </div>
+                  </div>
+                </div>
+              )
+            }
+
             return (
               <div
                 key={item.id}
@@ -480,6 +514,18 @@ export const TrajectoryStream: React.FC = () => {
                     <MarkdownView content={data.summary} />
                   </div>
                 )}
+              </div>
+            )
+          }
+
+          if (item.kind === 'system' && item.content) {
+            return (
+              <div
+                key={item.id}
+                className="my-2.5 px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200/90 text-xs text-slate-700 flex items-center gap-2.5 select-text shadow-2xs w-max max-w-full"
+              >
+                <i className="fa-solid fa-circle-info text-blue-500 text-xs shrink-0"></i>
+                <span className="font-mono text-[11px] leading-relaxed">{item.content}</span>
               </div>
             )
           }

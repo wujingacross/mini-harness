@@ -279,7 +279,7 @@ export class ReactLoopAgent implements Agent {
     this.session.append('user/message', { content: userBlocks, source: 'user' })
 
     let step = 0
-    const maxSteps = 10
+    const maxSteps = this.options.maxSteps ?? 30
     let endReason: TurnEndReason = { kind: 'completed' }
 
     while (step < maxSteps) {
@@ -368,7 +368,9 @@ export class ReactLoopAgent implements Agent {
 
       // 执行工具调用
       for (const call of toolCalls) {
-        if (signal.aborted) break
+        if (signal.aborted) {
+          break
+        }
 
         this.session.append('tool/call', {
           turn,
@@ -403,6 +405,14 @@ export class ReactLoopAgent implements Agent {
           isError: res.isError,
         })
       }
+    }
+
+    if (step >= maxSteps && endReason.kind === 'completed') {
+      this.session.append('context/message', {
+        content: [{ type: 'text', text: `⚠️ 已达到单轮执行步数上限 (${maxSteps} 步)。若任务尚未完成，请发送“继续”让智能体承接后续步骤。` }],
+        source: 'system',
+      })
+      this.ctx.emit('session/event', this.session, this.session.events[this.session.events.length - 1])
     }
 
     this.session.append('turn/end', { turn, reason: endReason })

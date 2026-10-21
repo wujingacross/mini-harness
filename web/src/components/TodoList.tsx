@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
-import { useSession, TodoItem } from '../context/SessionContext'
+import { useSession } from '../context/SessionContext'
 
 export const TodoList: React.FC = () => {
-  const { todos, planState, togglePlanMode } = useSession()
+  const { todos, planState, togglePlanMode, isRunning } = useSession()
   const [collapsed, setCollapsed] = useState(false)
 
   if (todos.length === 0 && !planState.active) {
@@ -16,154 +16,135 @@ export const TodoList: React.FC = () => {
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
   return (
-    <div
-      style={{
-        margin: '12px 16px',
-        padding: '12px 14px',
-        background: 'rgba(255, 255, 255, 0.03)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        borderRadius: 8,
-        backdropFilter: 'blur(8px)',
-        fontSize: '13px',
-      }}
-    >
-      {/* Header bar */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          cursor: 'pointer',
-          userSelect: 'none',
-        }}
-        onClick={() => setCollapsed(!collapsed)}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: '15px' }}>📋</span>
-          <span style={{ fontWeight: 600, color: '#e2e8f0' }}>任务规划与执行清单</span>
-          {planState.active && (
-            <span
-              style={{
-                fontSize: '11px',
-                padding: '2px 6px',
-                borderRadius: 4,
-                background: 'rgba(234, 179, 8, 0.15)',
-                color: '#eab308',
-                border: '1px solid rgba(234, 179, 8, 0.3)',
-                fontWeight: 600,
-              }}
-            >
-              PLAN MODE
-            </span>
-          )}
-          {totalCount > 0 && (
-            <span style={{ fontSize: '12px', color: '#94a3b8' }}>
-              ({completedCount}/{totalCount} 完成 · {progressPercent}%)
-            </span>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {planState.active && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                togglePlanMode(false)
-              }}
-              style={{
-                padding: '3px 8px',
-                fontSize: '11px',
-                background: 'rgba(239, 68, 68, 0.15)',
-                color: '#ef4444',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                borderRadius: 4,
-                cursor: 'pointer',
-              }}
-            >
-              退出规划模式 (/plan off)
-            </button>
-          )}
-          <span style={{ color: '#64748b', fontSize: '12px' }}>{collapsed ? '展开 ▼' : '收起 ▲'}</span>
-        </div>
-      </div>
-
-      {/* Progress Bar */}
-      {totalCount > 0 && !collapsed && (
+    <div className="w-full max-w-4xl mx-auto px-6 sm:px-16 pt-3 pb-1 select-none shrink-0">
+      <div className="rounded-xl border border-slate-200 bg-white/95 backdrop-blur-xs p-3.5 shadow-2xs text-[13px] transition-all">
+        {/* Header bar */}
         <div
-          style={{
-            marginTop: 10,
-            marginBottom: 10,
-            height: 4,
-            background: 'rgba(255, 255, 255, 0.08)',
-            borderRadius: 2,
-            overflow: 'hidden',
+          className="flex items-center justify-between cursor-pointer select-none"
+          onClick={() => {
+            setCollapsed(!collapsed)
           }}
         >
-          <div
-            style={{
-              height: '100%',
-              width: `${progressPercent}%`,
-              background: progressPercent === 100 ? '#10b981' : '#3b82f6',
-              transition: 'width 0.3s ease',
-            }}
-          />
-        </div>
-      )}
+          <div className="flex items-center gap-2">
+            <span className="flex h-5 w-5 items-center justify-center rounded-md bg-blue-50 text-blue-600 text-xs border border-blue-100">
+              <i className="fa-solid fa-list-check"></i>
+            </span>
+            <span className="font-semibold text-slate-800">任务规划与执行清单</span>
+            {planState.active && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-bold tracking-wide">
+                PLAN MODE
+              </span>
+            )}
+            {totalCount > 0 && (
+              <span className="text-xs text-slate-500 font-mono">
+                ({completedCount}/{totalCount} 完成 · {progressPercent}%)
+              </span>
+            )}
+          </div>
 
-      {/* Task List */}
-      {!collapsed && totalCount > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
-          {todos.map((todo, idx) => {
-            const isCompleted = todo.status === 'completed'
-            const isInProgress = todo.status === 'in_progress'
-
-            return (
-              <div
-                key={todo.id || idx}
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 8,
-                  padding: '4px 6px',
-                  borderRadius: 4,
-                  background: isInProgress ? 'rgba(59, 130, 246, 0.08)' : 'transparent',
-                  border: isInProgress ? '1px solid rgba(59, 130, 246, 0.2)' : '1px solid transparent',
+          <div className="flex items-center gap-2.5">
+            {planState.active && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  togglePlanMode(false)
                 }}
+                className="px-2.5 py-1 text-[11px] font-medium text-rose-600 bg-white hover:bg-rose-50 border border-rose-200 rounded-md transition cursor-pointer shadow-2xs"
+                title="退出规划模式"
               >
-                <span style={{ fontSize: '14px', lineHeight: '18px', userSelect: 'none' }}>
-                  {isCompleted ? '✅' : isInProgress ? '⏳' : '⚪'}
-                </span>
-                <span
-                  style={{
-                    color: isCompleted ? '#64748b' : isInProgress ? '#60a5fa' : '#cbd5e1',
-                    textDecoration: isCompleted ? 'line-through' : 'none',
-                    fontWeight: isInProgress ? 500 : 400,
-                    lineHeight: '18px',
-                    wordBreak: 'break-word',
-                  }}
-                >
-                  {todo.content}
-                </span>
-                {isInProgress && (
-                  <span
-                    style={{
-                      marginLeft: 'auto',
-                      fontSize: '11px',
-                      color: '#3b82f6',
-                      fontWeight: 600,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    进行中...
-                  </span>
-                )}
-              </div>
-            )
-          })}
+                退出规划模式 (/plan off)
+              </button>
+            )}
+            <span className="text-slate-400 hover:text-slate-600 text-xs flex items-center gap-1 transition">
+              <span>{collapsed ? '展开' : '收起'}</span>
+              <i
+                className={`fa-solid fa-chevron-down text-[10px] transition-transform duration-200 ${
+                  collapsed ? '-rotate-90' : ''
+                }`}
+              ></i>
+            </span>
+          </div>
         </div>
-      )}
+
+        {/* Progress Bar */}
+        {totalCount > 0 && !collapsed && (
+          <div className="mt-2.5 mb-2 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-200/50">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ease-out ${
+                progressPercent === 100 ? 'bg-emerald-500' : 'bg-blue-600'
+              }`}
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        )}
+
+        {/* Task List */}
+        {!collapsed && totalCount > 0 && (
+          <div className="mt-2.5 max-h-56 overflow-y-auto space-y-1.5 pr-1">
+            {todos.map((todo, idx) => {
+              const isCompleted = todo.status === 'completed'
+              const isInProgress = todo.status === 'in_progress'
+
+              return (
+                <div
+                  key={todo.id || idx}
+                  className={`flex items-start gap-2.5 px-2.5 py-1.5 rounded-lg text-xs transition leading-relaxed ${
+                    isInProgress
+                      ? isRunning
+                        ? 'bg-blue-50/70 border border-blue-200/70 text-blue-900'
+                        : 'bg-amber-50/40 border border-amber-200/60 text-slate-800'
+                      : isCompleted
+                      ? 'text-slate-400'
+                      : 'text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="shrink-0 mt-0.5 text-xs">
+                    {isCompleted ? (
+                      <i className="fa-solid fa-circle-check text-emerald-500"></i>
+                    ) : isInProgress ? (
+                      isRunning ? (
+                        <i className="fa-solid fa-circle-notch fa-spin text-blue-600"></i>
+                      ) : (
+                        <i className="fa-regular fa-circle-pause text-amber-600"></i>
+                      )
+                    ) : (
+                      <i className="fa-regular fa-circle text-slate-300"></i>
+                    )}
+                  </span>
+                  <span
+                    className={`flex-1 break-words ${
+                      isCompleted ? 'line-through text-slate-400' : isInProgress ? 'font-medium text-slate-900' : ''
+                    }`}
+                  >
+                    {todo.content}
+                  </span>
+                  {isInProgress && (
+                    <span
+                      className={`shrink-0 ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded flex items-center gap-1 ${
+                        isRunning
+                          ? 'text-blue-600 bg-blue-100/70'
+                          : 'text-amber-700 bg-amber-100/70 border border-amber-200/50'
+                      }`}
+                    >
+                      {isRunning ? (
+                        '进行中'
+                      ) : (
+                        <>
+                          <i className="fa-solid fa-pause text-[8px]"></i>
+                          <span>已挂起</span>
+                        </>
+                      )}
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
 export default TodoList
+

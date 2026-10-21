@@ -118,15 +118,24 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (event.type === 'user/message') {
           // Avoid duplicate user message if already optimistically added
           setEvents((prev) => {
+            const newText = typeof event.data?.content === 'string'
+              ? event.data.content
+              : event.data?.content?.[0]?.text
+
             const hasSame = prev.some((e) => {
-              if (e.type !== 'user/message') return false
+              if (e.type !== 'user/message') {
+                return false
+              }
               const prevText = typeof e.data?.content === 'string'
                 ? e.data.content
                 : e.data?.content?.[0]?.text
-              const newText = typeof event.data?.content === 'string'
-                ? event.data.content
-                : event.data?.content?.[0]?.text
-              return prevText === newText
+              if (prevText === newText) {
+                return true
+              }
+              if (typeof prevText === 'string' && typeof newText === 'string') {
+                return prevText.replace(/^\/plan\s+/, '').trim() === newText.trim()
+              }
+              return false
             })
             return hasSame ? prev : [...prev, event]
           })
@@ -254,37 +263,63 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         await loadSessions()
       }
 
-      if (!targetSessionId) return
+      if (!targetSessionId) {
+        return
+      }
+
+      const trimmedText = text.trim()
+      const isPureControlCommand = trimmedText === '/plan' || trimmedText === '/plan off' || trimmedText === '/compact'
 
       // 1. Optimistically append user message so it appears immediately in the main conversation area!
-      const userEvent: SessionEvent = {
-        type: 'user/message',
-        data: { content: [{ type: 'text', text }], source: 'user' },
+      if (!isPureControlCommand) {
+        const displayPrompt = trimmedText.startsWith('/plan ')
+          ? trimmedText.slice(6).trim()
+          : text
+
+        const userEvent: SessionEvent = {
+          type: 'user/message',
+          data: { content: [{ type: 'text', text: displayPrompt }], source: 'user' },
+        }
+        setEvents((prev) => [...prev, userEvent])
       }
-      setEvents((prev) => [...prev, userEvent])
 
       // 2. Optimistically update session title in sidebar and header if it was '新会话'
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.id === targetSessionId && (!s.title || s.title === '新会话')
-            ? { ...s, title: text.slice(0, 32) }
-            : s,
-        ),
-      )
+      if (!isPureControlCommand) {
+        const displayPrompt = trimmedText.startsWith('/plan ')
+          ? trimmedText.slice(6).trim()
+          : text
+        setSessions((prev) =>
+          prev.map((s) => {
+            if (s.id === targetSessionId && (!s.title || s.title === '新会话')) {
+              return { ...s, title: displayPrompt.slice(0, 32) }
+            }
+            return s
+          }),
+        )
+      }
 
       // 3. Ensure SSE connection is active without closing/restarting
       if (!eventSourceRef.current) {
         connectSSE(targetSessionId)
       }
 
-      setIsRunning(true)
+      if (!isPureControlCommand) {
+        setIsRunning(true)
+      }
+
       const effectiveModel = model || selectedModel
       try {
-        await fetch(`/api/sessions/${targetSessionId}/prompt`, {
+        const res = await fetch(`/api/sessions/${targetSessionId}/prompt`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ prompt: text, model: effectiveModel }),
         })
+        if (res.ok) {
+          const data = await res.json()
+          if (data && typeof data.running === 'boolean' && !data.running) {
+            setIsRunning(false)
+          }
+        }
       } catch (err) {
         console.error('Failed to send prompt:', err)
         setIsRunning(false)

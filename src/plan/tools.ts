@@ -38,7 +38,7 @@ export function createExitPlanModeTool(ctx: Context): ToolDefinition<{ plan: str
       const decision = await planMode.reviewPlan(plan, session)
       if (decision.approved) {
         planMode.set(session, false, 'plan_approved')
-        return 'Plan approved — plan mode exited; carry out the plan starting with your next step.'
+        return 'Plan approved — plan mode exited. You can now carry out the plan; initialize your execution todo list with todo_write starting with your next step.'
       } else {
         const feedback = decision.feedback?.trim()
         if (feedback) {

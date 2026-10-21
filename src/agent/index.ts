@@ -8,6 +8,7 @@ export type AgentStatus = 'idle' | 'running' | 'disposed'
 export interface AgentOptions {
   model?: string
   systemPrompt?: string
+  maxSteps?: number
 }
 
 export interface Agent {

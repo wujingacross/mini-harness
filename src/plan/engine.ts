@@ -4,11 +4,13 @@ import type { PlanModeConfig, PlanApprovalDecision, PlanApprovalHandler, PlanSta
 
 export const DEFAULT_PLAN_SECTION = `[PLAN MODE ACTIVE]
 You are currently in PLAN MODE. Follow these rules strictly:
-1. Explore the codebase and gather relevant context first.
-2. Design a detailed, actionable approach and structure your work into concrete tasks using the \`todo_write\` tool.
-3. Do NOT make file edits, modify code, or run destructive commands while in plan mode.
-4. When your plan is ready, present your complete proposal using the \`exit_plan_mode\` tool. Your plan must be in Markdown format and start with a top-level heading (# Heading).
-5. Once the plan is approved, plan mode will automatically exit and you can proceed with execution.`
+1. FIRST ACTION: You MUST call \`todo_write\` in your VERY FIRST STEP to establish and project the plan-phase investigation tasks before doing deep exploration.
+2. SCOPE OF TODOS: Scope this plan-phase todo list STRICTLY to 2-4 concrete investigation and research steps (e.g. "Review project architecture", "Analyze hardcoded strings", "Draft Markdown proposal"). Do NOT put future post-approval coding/implementation phases into this list.
+3. CONCISE & FOCUSED EXPLORATION: Explore the codebase efficiently using dedicated tools (view_file, find_by_name, grep_search). Do not run excessive, repetitive shell greps. Inspect only necessary files.
+4. ROADMAP IN PROPOSAL: In your Markdown proposal, clearly define the future implementation roadmap and concrete milestones in detail.
+5. NO CODE MODIFICATIONS: Do NOT make file edits, modify code, or run destructive commands while in plan mode.
+6. EXITING PLAN MODE: When your investigation and design are complete, mark all plan-phase research todos completed (100%), and present your complete proposal using the \`exit_plan_mode\` tool. Your plan must be in Markdown format and start with a top-level heading (# Heading).
+7. POST-APPROVAL EXECUTION: Once the plan is approved, plan mode will automatically exit and you can proceed with execution by initializing a fresh implementation todo list via \`todo_write\`.`
 
 declare module 'cordis' {
   interface Context {
@@ -47,6 +49,20 @@ export class PlanModeController extends Service {
 
     this.ctx.on('agent/turn-end', (agent) => {
       this.commitPending(agent.session)
+    })
+
+    // 在 Plan 模式下物理拦截所有修改文件的工具调用（Hard Policy Guard）
+    const writeTools = new Set(['write_to_file', 'replace_file_content', 'multi_replace_file_content'])
+    this.ctx.on('tools/execute', async (exec, next) => {
+      if (exec.session && this.isActive(exec.session)) {
+        if (writeTools.has(exec.name)) {
+          return {
+            content: `Tool "${exec.name}" is forbidden in PLAN MODE. You are in read-only planning mode. Do NOT edit files or modify code until your plan is submitted and approved via exit_plan_mode.`,
+            isError: true,
+          }
+        }
+      }
+      return await next()
     })
   }
 

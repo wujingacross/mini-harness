@@ -65,12 +65,20 @@ export interface TodoWriteEvent {
    ```text
    [PLAN MODE ACTIVE]
    You are currently in PLAN MODE. Follow these rules strictly:
-   1. Explore the codebase and gather relevant context first.
-   2. Design a detailed, actionable approach and structure your work into concrete tasks using the `todo_write` tool.
-   3. Do NOT make file edits, modify code, or run destructive commands while in plan mode.
-   4. When your plan is ready, present your complete proposal using the `exit_plan_mode` tool. Your plan must be in Markdown format and start with a top-level heading (# Heading).
-   5. Once the plan is approved, plan mode will automatically exit and you can proceed with execution.
+   1. FIRST ACTION: You MUST call `todo_write` in your VERY FIRST STEP to establish and project the plan-phase investigation tasks before doing deep exploration.
+   2. SCOPE OF TODOS: Scope this plan-phase todo list STRICTLY to 2-4 concrete investigation and research steps (e.g. "Review project architecture", "Analyze hardcoded strings", "Draft Markdown proposal"). Do NOT put future post-approval coding/implementation phases into this list.
+   3. CONCISE & FOCUSED EXPLORATION: Explore the codebase efficiently using dedicated tools (view_file, find_by_name, grep_search). Do not run excessive, repetitive shell greps. Inspect only necessary files.
+   4. ROADMAP IN PROPOSAL: In your Markdown proposal, clearly define the future implementation roadmap and concrete milestones in detail.
+   5. NO CODE MODIFICATIONS: Do NOT make file edits, modify code, or run destructive commands while in plan mode.
+   6. EXITING PLAN MODE: When your investigation and design are complete, mark all plan-phase research todos completed (100%), and present your complete proposal using the `exit_plan_mode` tool. Your plan must be in Markdown format and start with a top-level heading (# Heading).
+   7. POST-APPROVAL EXECUTION: Once the plan is approved, plan mode will automatically exit and you can proceed with execution by initializing a fresh implementation todo list via `todo_write`.
    ```
+
+> 📌 **唯一事实来源**：以上文本即 `src/plan/engine.ts` 中导出的 `DEFAULT_PLAN_SECTION` 常量，文档与实现严格保持一致；如需调整策略，直接修改该常量即可全局生效。
+
+> 💡 **核心规范：规划期待办与落地期待办生命周期解耦**
+> * **规划期（Plan Phase）**：`todo_write` 严格聚焦于“调研、摸底与方案起草”的具体步骤。方案提交审批时，该阶段调研任务全部 100% 打勾完成；
+> * **落地期（Execution Phase）**：方案通过、退出 Plan Mode 后，智能体通过 `todo_write` 全量置换初始化全新的施工看板（阶段一、阶段二...），从 0% 稳步推进至 100%，避免将未来的长周期任务与当前的方案规划混为一谈。
 
 ---
 
@@ -102,11 +110,43 @@ interface ExitPlanArgs {
 
 ---
 
+### 3.5 单轮步数预算与“继续”承接 (`maxSteps`)
+
+规划模式与待办清单极大提升了长链路任务的确定性，但 ReAct 循环本身还需要一道**防跑飞护栏**：一旦模型在工具调用上陷入死循环（反复重试同一个失败命令、无限 grep），既会烧光 Token，也会让用户对着永远不返回的会话束手无策。
+
+`ReactLoopAgent` 因此引入**单轮步数预算（step budget）**：
+
+```typescript
+export interface AgentOptions {
+  model?: string
+  systemPrompt?: string
+  maxSteps?: number // 单轮 while 循环的步数上限，默认 30
+}
+```
+
+1. **预算收敛**：`runTurn()` 中 `while (step < maxSteps)` 强制封顶，默认 `30` 步（早期硬编码的 `10` 步常导致复杂任务被过早截断）；
+2. **优雅收尾**：触达上限时，Turn 仍以 `{ kind: 'completed' }` 正常结束（而非 `error`），会话不会进入异常态，SSE 与前端运行态可正常回落；
+3. **上下文提示落盘**：追加一条 `context/message`（`source: 'system'`）事件：
+
+   ```text
+   ⚠️ 已达到单轮执行步数上限 (30 步)。若任务尚未完成，请发送“继续”让智能体承接后续步骤。
+   ```
+
+   该事件既是 UI 提示来源，也会经 `deriveMessages()` 投影为 `<context source="system">` 块进入模型视界，使续聊时模型清楚知道“上一轮是被预算截断的，而不是任务已完成”；
+4. **自然完成不打扰**：若模型在预算内收敛（无待执行工具调用），则不会写入任何提示事件。
+
+> 🧠 **设计取舍**：步数上限是“单轮”而非“会话”级配额。用户随时可以发送 `继续`（或新指令）开启新一轮预算，既避免单轮失控，又不会限制长周期重构任务的推进。
+
+---
+
 ## 4. Web 控制台呈现
 
 * **任务进度条与清单面板**：在 Web 界面主工作区上方渲染 `TodoList` 组件，实时展示任务完成比例（如 `(2/4 完成 · 50%)`）以及各项状态指示（`✅ 已完成`、`⏳ 进行中`、`⚪ 等待中`）；
+* **运行态感知的挂起标记**：`in_progress` 任务在会话运行中显示蓝色旋转指示器与“进行中”，当会话空闲时自动切换为琥珀色“已挂起”，让用户一眼看出“是哪一步在等自己发话”；
 * **Plan 模式状态徽标**：当规划模式激活时，顶部高亮提示 `PLAN MODE`，并提供 `/plan off` 一键退出快捷按键；
-* **轨迹流工具卡片**：轨迹流中清晰高亮 `exit_plan_mode`（带方案标题）与 `todo_write` 调用卡片。
+* **系统提示气泡**：`context/message` 事件在轨迹流（Trajectory）中以淡蓝信息条渲染，用于展示步数预算触顶、`/plan` 开关确认等系统级提示；
+* **轨迹流工具卡片**：轨迹流中清晰高亮 `exit_plan_mode`（带方案标题）与 `todo_write` 调用卡片；
+* **乐观用户消息去重**：`/plan <instruction>` 这类“指令 + 自然语言”混合输入，前端只回显自然语言部分，并通过前缀归一化比对避免与 SSE 回流的 `user/message` 重复渲染。
 
 ---
 

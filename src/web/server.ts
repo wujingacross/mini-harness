@@ -402,7 +402,12 @@ export class WebServer extends Service {
       agent.send(prompt)
 
       res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ status: 'accepted', sessionId, model }))
+      res.end(JSON.stringify({
+        status: 'accepted',
+        sessionId,
+        model,
+        running: agent.status === 'running',
+      }))
       return
     }
 
