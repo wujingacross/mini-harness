@@ -1,13 +1,15 @@
 import React, { useState } from 'react'
-import { SessionProvider } from './context/SessionContext'
+import { SessionProvider, useSession } from './context/SessionContext'
 import { Sidebar } from './components/Sidebar'
 import { Header } from './components/Header'
 import { TrajectoryStream } from './components/TrajectoryStream'
 import { FloatingInputArea } from './components/FloatingInputArea'
 import { TodoList } from './components/TodoList'
+import { EventReplayView } from './components/EventReplayView'
 
 export const AppContent: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const { activeTab } = useSession()
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-white text-slate-900 select-none">
@@ -23,7 +25,7 @@ export const AppContent: React.FC = () => {
 
         <main className="flex-1 flex flex-col overflow-hidden relative">
           <TodoList />
-          <TrajectoryStream />
+          {activeTab === 'trajectory' ? <EventReplayView /> : <TrajectoryStream />}
           <FloatingInputArea />
         </main>
       </div>

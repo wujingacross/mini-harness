@@ -248,14 +248,7 @@ export const TrajectoryStream: React.FC = () => {
     streamEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [items])
 
-  const visibleItems = useMemo(() => {
-    if (activeTab === 'trajectory') {
-      return items.filter(
-        (it) => it.kind === 'think' || it.kind === 'tool' || it.kind === 'compaction' || it.kind === 'system',
-      )
-    }
-    return items
-  }, [items, activeTab])
+  const visibleItems = items
 
   return (
     <div className="flex-1 overflow-y-auto px-16 py-8 space-y-2 max-w-4xl w-full mx-auto select-text font-sans flex flex-col justify-start">
